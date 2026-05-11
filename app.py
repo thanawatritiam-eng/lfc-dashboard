@@ -1,132 +1,193 @@
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
 
-# --- 1. SETTINGS & FULL CSS INJECTION (แกะจาก newslfc.html) ---
-st.set_page_config(page_title="เจมส์ป๊อก LFC - ขยี้ทุกประเด็นหงส์แดง", layout="wide")
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="เจมส์ป๊อก LFC - Dashboard", layout="wide")
 
+# --- 2. CUSTOM CSS (แกะสไตล์จาก newslfc.html เป๊ะๆ) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap');
     
-    /* พื้นหลังหลักของเว็บ */
-    .stApp { background-color: #f8fafc; font-family: 'Noto Sans Thai', sans-serif; }
+    /* ลบส่วนเกินของ Streamlit ออกให้หมดเพื่อให้เหมือนหน้าเว็บจริง */
+    .block-container { padding: 0 !important; max-width: 100% !important; }
+    [data-testid="stHeader"] { display: none; }
     
-    /* Header สีแดงลิเวอร์พูล ตัวหนังสือทอง/ขาว [ตามสั่ง: พื้นหลังเข้มตัวหนังสืออ่อน] */
-    .header-banner {
-        background-color: #C8102E;
-        padding: 40px 20px;
-        text-align: center;
-        color: #F6EB61; /* สีทอง */
-        border-radius: 0 0 20px 20px;
-        margin-bottom: 30px;
+    body, .stApp {
+        font-family: 'Noto Sans Thai', sans-serif;
+        background-color: #f1f5f9; /* พื้นหลังเทาอ่อนเพื่อให้ Content สีขาวลอยเด่น */
+    }
+
+    /* Navbar ด้านบน (สีน้ำเงินเข้ม ตัวหนังสือสีขาว) */
+    .nav-bar-wrapper {
+        background-color: #0f172a;
+        padding: 15px 0;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .header-banner h1 { color: #ffffff !important; font-weight: 800; margin-bottom: 5px; }
-    .header-banner p { color: #F6EB61 !important; font-size: 1.1rem; }
 
-    /* การ์ดสถิติ พื้นหลังขาว ตัวหนังสือดำ [ตามสั่ง: พื้นหลังอ่อนตัวหนังสือเข้ม] */
-    .stat-box {
-        background: white;
-        padding: 20px;
-        border-radius: 15px;
-        border-bottom: 4px solid #C8102E;
+    /* Header แบนเนอร์ (สีแดงลิเวอร์พูล ตัวหนังสือทอง/ขาว) */
+    .header-banner {
+        background-color: #C8102E;
+        color: #ffffff;
+        padding: 50px 20px;
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-bottom: 8px solid #F6EB61; /* เส้นสีทอง */
     }
-    .stat-box h4 { color: #64748b !important; margin-bottom: 10px; font-size: 14px; }
-    .stat-box h2 { color: #1e293b !important; font-weight: 800; font-size: 28px; }
+    .header-banner h1 { color: #ffffff !important; font-size: 3.5rem; font-weight: 800; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+    .header-banner p { color: #F6EB61 !important; font-size: 1.3rem; margin-top: 10px; font-weight: 600; }
 
-    /* คอนเทนเนอร์บทวิเคราะห์ */
-    .analysis-card {
+    /* การ์ดสถิติ (พื้นหลังขาว ตัวหนังสือดำเข้ม) [แก้ปัญหาเรื่องการอ่าน] */
+    .stat-card {
         background: white;
-        padding: 25px;
-        border-radius: 15px;
-        color: #1e293b;
-        border-left: 6px solid #F6EB61;
-        margin-bottom: 20px;
+        padding: 30px;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border-top: 6px solid #C8102E;
+        transition: transform 0.2s;
     }
-    .analysis-card h3 { color: #C8102E !important; font-weight: 700; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-card h4 { color: #475569 !important; font-size: 1rem; margin-bottom: 10px; }
+    .stat-card h2 { color: #1e293b !important; font-size: 2.5rem; font-weight: 800; margin: 0; }
 
-    /* ล้างค่า Padding ของ Streamlit ให้เหมือนเว็บทั่วไป */
-    .block-container { padding-top: 0rem; padding-bottom: 2rem; }
+    /* คอนเทนเนอร์สีเข้ม (พื้นหลังดำ ตัวหนังสือทอง) [ตามสั่ง] */
+    .dark-box {
+        background-color: #1e293b;
+        color: #F6EB61;
+        padding: 35px;
+        border-radius: 20px;
+        margin: 25px 0;
+        border-right: 10px solid #C8102E;
+    }
+    .dark-box h3 { color: #ffffff !important; font-size: 1.8rem; margin-bottom: 15px; border-bottom: 2px solid #C8102E; padding-bottom: 10px; }
+    .dark-box p { color: #F6EB61 !important; font-size: 1.1rem; line-height: 1.8; }
+
+    /* คอนเทนเนอร์สีอ่อน (พื้นหลังขาว ตัวหนังสือดำ) [ตามสั่ง] */
+    .light-box {
+        background-color: #ffffff;
+        color: #1e293b;
+        padding: 35px;
+        border-radius: 20px;
+        margin: 25px 0;
+        border-left: 10px solid #C8102E;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .light-box h3 { color: #C8102E !important; font-size: 1.8rem; margin-bottom: 15px; }
+    .light-box p { color: #334155 !important; font-size: 1.1rem; line-height: 1.8; }
+
+    /* ปุ่มกด Navbar ของ Streamlit ให้ดูเหมือนปุ่มจริง */
+    div.stButton > button {
+        background-color: #1e293b;
+        color: white;
+        border: 2px solid #F6EB61;
+        border-radius: 8px;
+        padding: 10px 20px;
+        width: 100%;
+    }
+    div.stButton > button:hover {
+        background-color: #C8102E;
+        border-color: white;
+    }
     </style>
+    """, unsafe_allow_html=True)
 
+# --- 3. LOGIC: MULTI-PAGE NAVIGATION (Navbar ด้านบน) ---
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "📊 Dashboard"
+
+# จำลอง Navbar ด้วยคอลัมน์ด้านบน
+st.markdown('<div class="nav-bar-wrapper">', unsafe_allow_html=True)
+nav_col1, nav_col2, nav_col3, nav_col4 = st.columns(4)
+with nav_col1:
+    if st.button("📊 Dashboard"): st.session_state.current_page = "📊 Dashboard"
+with nav_col2:
+    if st.button("🧠 แทคติก"): st.session_state.current_page = "🧠 แทคติก"
+with nav_col3:
+    if st.button("💬 ข่าวสาร"): st.session_state.current_page = "💬 ข่าวสาร"
+with nav_col4:
+    if st.button("🗳️ โหวต"): st.session_state.current_page = "🗳️ โหวต"
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 4. HEADER ---
+st.markdown(f"""
     <div class="header-banner">
         <h1>🔴 เจมส์ป๊อก LFC</h1>
-        <p>Dashboard ขยี้ทุกประเด็นหงส์แดง - วิเคราะห์เจาะลึกแบบ "โต๊ะรก"</p>
+        <p>Dashboard วิเคราะห์เจาะลึก: {st.session_state.current_page}</p>
     </div>
     """, unsafe_allow_html=True)
 
-# --- 2. MATCH SELECTOR (SIDEBAR) ---
-st.sidebar.markdown("<h2 style='color:#C8102E;'>⚽ เมนูควบคุม</h2>", unsafe_allow_html=True)
-match_day = st.sidebar.selectbox("เลือกแมตช์วิเคราะห์", ["LFC 1-1 Chelsea (10/05/2026)", "LFC 2-3 Man Utd (03/05/2026)"])
+# --- 5. PAGE CONTENT ---
+st.markdown('<div style="max-width: 1200px; margin: auto; padding: 40px 20px;">', unsafe_allow_html=True)
 
-# --- 3. DASHBOARD GRID (สไตล์การ์ดจากไฟล์ HTML) ---
-col1, col2, col3, col4 = st.columns(4)
+if st.session_state.current_page == "📊 Dashboard":
+    # --- สถิติ (Grid 4 ช่อง) ---
+    st.markdown("### 🏟️ สถิติแมตช์ล่าสุด: Liverpool vs Chelsea")
+    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+    with stat_col1:
+        st.markdown('<div class="stat-card"><h4>ผลการแข่งขัน</h4><h2>1 - 1</h2></div>', unsafe_allow_html=True)
+    with stat_col2:
+        st.markdown('<div class="stat-card"><h4>ครองบอล</h4><h2 style="color:#C8102E;">42%</h2></div>', unsafe_allow_html=True)
+    with stat_col3:
+        st.markdown('<div class="stat-card"><h4>ยิงเข้ากรอบ</h4><h2>4 / 11</h2></div>', unsafe_allow_html=True)
+    with stat_col4:
+        st.markdown('<div class="stat-card"><h4>ระดับความล้ำ</h4><h2 style="color:#f59e0b;">TOP TIER</h2></div>', unsafe_allow_html=True)
 
-with col1:
-    st.markdown('<div class="stat-box"><h4>ผลการแข่ง</h4><h2>1 - 1</h2></div>', unsafe_allow_html=True)
-with col2:
-    st.markdown('<div class="stat-box"><h4>การครองบอล</h4><h2 style="color:#C8102E !important;">42%</h2></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown('<div class="stat-box"><h4>โอกาสยิง</h4><h2>11 (4)</h2></div>', unsafe_allow_html=True)
-with col4:
-    st.markdown('<div class="stat-box"><h4>ความล้ำ</h4><h2 style="color:#F6EB61 !important;">TOP TIER</h2></div>', unsafe_allow_html=True)
+    # --- กราฟโมเมนตัม (จาก newslfc.html) ---
+    st.markdown("### 📊 โมเมนตัมการแข่งขัน (Minute by Minute)")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[0, 6, 35, 45, 60, 67, 90], 
+        y=[0, 10, -5, 2, 6, -10, 2],
+        mode='lines+markers+text',
+        line=dict(color='#C8102E', width=4),
+        text=["เริ่ม", "⚽ กราเฟนแบร์ก", "⚽ เอ็นโซ่", "พักครึ่ง", "", "⚠️ เปลี่ยนตัว", "จบ"],
+        textposition="top center"
+    ))
+    fig.update_layout(height=400, plot_bgcolor='white', yaxis=dict(title="Momentum", range=[-15, 15]))
+    st.plotly_chart(fig, use_container_width=True)
 
-# --- 4. MOMENTUM CHART (เลียนแบบ Chart.js ใน newslfc.html) ---
-st.write("")
-st.subheader("📊 กราฟโมเมนตัมนาทีต่อนาที")
+    st.markdown("""
+        <div class="dark-box">
+            <h3>🔥 ขยี้ประเด็นร้อน: นาทีที่ 67 คือคำตอบ?</h3>
+            <p>จากการวิเคราะห์พบว่าหลังจากถอดตัวรุกที่กดดันแดนหน้าออก โมเมนตัมของลิเวอร์พูลตกลงทันที (ดูได้จากกราฟด้านบน) 
+            นี่คือข้อมูลสำคัญที่คุณเจมส์ป๊อกสามารถนำไปตัดคลิปขยี้ใน TikTok ได้ว่า "สล็อตพลาดหรือตั้งใจ?"</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# สร้างข้อมูลกราฟจำลองให้เหมือนในไฟล์ HTML
-minutes = [0, 6, 15, 35, 45, 60, 67, 90]
-momentum = [0, 8, 4, -5, 2, 5, -8, 1] # 67 นาที โมเมนตัมตกตามบทวิเคราะห์คุณ
-colors = ['#1e293b' if m >= 0 else '#C8102E' for m in momentum]
+elif st.session_state.current_page == "🧠 แทคติก":
+    st.markdown("""
+        <div class="light-box">
+            <h3>🧠 Tactical Analysis: ระบบ 4-2-3-1 ของสล็อต</h3>
+            <p>ในนัดนี้ลิเวอร์พูลพยายามใช้การเพรสซิ่งแดนบน (High Press) แต่ทว่าการยืนตำแหน่งของคู่กลางยังทับซ้อนกันในบางจังหวะ 
+            ทำให้เชลซีมีพื้นที่ในการสวนกลับเร็ว (Counter Attack) ได้ง่ายในช่วงครึ่งหลัง</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-fig = go.Figure()
-fig.add_trace(go.Scatter(
-    x=minutes, y=momentum,
-    mode='lines+markers+text',
-    line=dict(color='#C8102E', width=3),
-    marker=dict(size=10, color=colors),
-    text=["เริ่ม", "⚽ ยิงนำ", "", "⚽ เสียประตู", "", "", "⚠️ เปลี่ยนตัว", "จบเกม"],
-    textposition="top center"
-))
+elif st.session_state.current_page == "💬 ข่าวสาร":
+    st.markdown("""
+        <div class="dark-box">
+            <h3>📰 สรุปข่าวจาก Tier 1</h3>
+            <p>โรมาโน่รายงาน: ลิเวอร์พูลกำลังเจรจาขยายสัญญากับแกนหลัก 3 คนในช่วงซัมเมอร์นี้ คาดว่าจะมีความชัดเจนหลังจบฤดูกาล</p>
+        </div>
+        <div class="light-box">
+            <h3>💬 บทสัมภาษณ์หลังเกม</h3>
+            <p>"เราพอใจกับ 1 แต้มในวันนี้ แต่เราควรจะเด็ดขาดกว่านี้ในจังหวะสุดท้าย" - อาร์เน สล็อต</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-fig.update_layout(
-    height=400,
-    plot_bgcolor='white',
-    paper_bgcolor='#f8fafc',
-    yaxis=dict(showgrid=True, gridcolor='#e5e7eb', range=[-15, 15], title="Momentum Score"),
-    xaxis=dict(showgrid=False, title="นาทีการแข่งขัน")
-)
-st.plotly_chart(fig, use_container_width=True)
-
-# --- 5. ANALYSIS SECTION (สไตล์ "โต๊ะรก" ของแท้) ---
-st.divider()
-col_left, col_right = st.columns([2, 1])
-
-with col_left:
-    st.markdown(f"""
-    <div class="analysis-card">
-        <h3>🔍 บทวิเคราะห์: หงส์สะดุดเพราะการแก้เกม?</h3>
-        <p>ประเด็นที่น่าสนใจที่สุดในนัดนี้คือ <b>"นาทีที่ 67"</b> หลังจากสล็อตตัดสินใจถอดอึงูโมฮาออก 
-        เราเห็นได้ชัดว่าโครงสร้างเกมรุกเปลี่ยนไปทันที เชลซีเริ่มกล้าบุกสวนกลับมากขึ้น 
-        จนนำมาสู่ความผิดพลาดในแดนกลาง</p>
-        <p style="margin-top:10px; font-weight:600; color:#C8102E;">💡 Key Takeaway: สล็อตต้องตอบคำถามเรื่องการจัดการพละกำลังนักเตะในช่วงท้ายเกม</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_right:
-    st.markdown("### 🗳️ โหวตประเด็นร้อน")
-    vote = st.radio("คุณเห็นด้วยกับการเปลี่ยนตัวนาที 67 ไหม?", ["เห็นด้วย (ต้องพักตัว)", "ไม่เห็นด้วย (เกมพัง)", "เฉยๆ"])
-    if st.button("ส่งคะแนนโหวต"):
-        st.success("บันทึกข้อมูลเรียบร้อย!")
+elif st.session_state.current_page == "🗳️ โหวต":
+    st.markdown('<div class="light-box">', unsafe_allow_html=True)
+    st.subheader("🗳️ Man of the Match (Fan Vote)")
+    m_choice = st.radio("เลือกนักเตะที่คุณประทับใจที่สุด:", ["Salah", "Gravenberch", "Van Dijk", "Konate"])
+    if st.button("ยืนยันการโหวต"):
         st.balloons()
+        st.success(f"ขอบคุณครับ! คุณเลือก {m_choice} เป็น MOM นัดนี้")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 6. FOOTER ---
-st.markdown("""
-    <div style="text-align:center; padding:30px; color:#64748b; font-size:12px;">
-        © 2026 JamesPok LFC Dashboard | ข้อมูลสดจาก API-FOOTBALL
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
