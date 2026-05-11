@@ -2,72 +2,119 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- 1. CONFIG & STYLE (ดึงความสวยจาก HTML เดิม) ---
+# --- 1. SETTINGS & CSS (จัดแต่งให้เหมือน HTML ต้นฉบับ) ---
 st.set_page_config(page_title="JamesPok LFC Dashboard", layout="wide")
 
-# ใช้ CSS เพื่อทำ Navbar และปรับแต่งสี (ดึงโทนสีจากไฟล์เดิมของคุณ)
 st.markdown("""
     <style>
-    .main { background-color: #f8fafc; }
-    .nav-bar {
+    @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Prompt', sans-serif;
+        background-color: #f8fafc;
+    }
+    
+    /* Navbar สไตล์ไฟล์ HTML เดิม */
+    .nav-container {
         background-color: #1e293b;
-        padding: 1rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
+        padding: 15px 30px;
         display: flex;
         justify-content: space-between;
+        align-items: center;
         color: white;
+        border-radius: 0 0 15px 15px;
+        margin-bottom: 25px;
     }
-    .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    
+    /* Card สไตล์ไฟล์ HTML เดิม */
+    .stat-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border-top: 5px solid #E31B23;
+        margin-bottom: 20px;
+    }
+    
+    .vibrant-red { color: #E31B23; font-weight: bold; }
+    .vibrant-blue { color: #034694; font-weight: bold; }
     </style>
-    <div class="nav-bar">
-        <div style="font-weight:bold; font-size:20px;">🔴 JamesPok LFC Dashboard</div>
-        <div>หน้าแรก | วิเคราะห์แมตช์ | ระบบโหวต | เกี่ยวกับเรา</div>
+    
+    <div class="nav-container">
+        <div style="font-size: 22px; font-weight: 700;">🔴 JamesPok <span style="font-weight: 300;">LFC News</span></div>
+        <div style="font-size: 14px;">หน้าแรก | วิเคราะห์แมตช์ | สถิติเชิงลึก | ระบบโหวต</div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- 2. DATA (จำลองข้อมูล) ---
-mock_data = {
-    "2026-05-10": {
-        "opponent": "Chelsea",
-        "score": "1-1",
-        "stats": {"Possession": [42, 58], "Shots": [11, 14], "On Target": [4, 5]},
-        "news": "หงส์สะดุด! สล็อตประชดสื่อหลังโดนโห่"
+# --- 2. DATA (จำลองข้อมูลจากแมตช์ Chelsea) ---
+match_info = {
+    "title": "Liverpool vs Chelsea 1-1",
+    "headline": "หงส์สะดุด! สล็อตประชดสื่อหลังโดนโห่ - วิเคราะห์ความผิดพลาดนาที 67",
+    "stats": {
+        "ครองบอล (%)": [42, 58],
+        "โอกาสยิง": [11, 14],
+        "ยิงเข้ากรอบ": [4, 5],
+        "เตะมุม": [6, 8],
+        "ฟาวล์": [10, 12]
     }
 }
 
-# --- 3. SIDEBAR ---
-st.sidebar.header("⚽ เมนูควบคุม")
-selected_date = st.sidebar.selectbox("เลือกแมตช์", list(mock_data.keys()))
-match = mock_data[selected_date]
+# --- 3. MAIN DASHBOARD ---
+st.markdown(f"### 🏟️ {match_info['title']}")
+st.markdown(f"<p style='font-size: 18px; color: #64748b;'>{match_info['headline']}</p>", unsafe_allow_html=True)
 
-# --- 4. MAIN DASHBOARD ---
-st.header(f"วิเคราะห์แมตช์ vs {match['opponent']}")
-
-col1, col2, col3 = st.columns(3)
+# ส่วนของสถิติแบบ Card (เหมือนในไฟล์ HTML)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("ผลการแข่งขัน", match['score'])
+    st.markdown('<div class="stat-card"><p>ผลการแข่ง</p><h3>1 - 1</h3></div>', unsafe_allow_html=True)
 with col2:
-    st.metric("Possession", f"{match['stats']['Possession'][0]}%")
+    st.markdown(f'<div class="stat-card"><p>LFC ครองบอล</p><h3 class="vibrant-red">{match_info["stats"]["ครองบอล (%)"][0]}%</h3></div>', unsafe_allow_html=True)
 with col3:
-    st.metric("โอกาสยิง", match['stats']['Shots'][0])
+    st.markdown(f'<div class="stat-card"><p>โอกาสยิง</p><h3>{match_info["stats"]["โอกาสยิง"][0]} ครั้ง</h3></div>', unsafe_allow_html=True)
+with col4:
+    st.markdown('<div class="stat-card"><p>Tier ข่าว</p><h3 style="color:#10b981;">Tier 1</h3></div>', unsafe_allow_html=True)
 
-# ส่วนของกราฟ (ดึงสไตล์จากไฟล์ HTML เดิม)
-st.subheader("📊 เปรียบเทียบสถิติเชิงลึก")
-fig = go.Figure()
-fig.add_trace(go.Bar(name='LFC', x=list(match['stats'].keys()), y=[v[0] for v in match['stats'].values()], marker_color='#E31B23'))
-fig.add_trace(go.Bar(name=match['opponent'], x=list(match['stats'].keys()), y=[v[1] for v in match['stats'].values()], marker_color='#034694'))
-fig.update_layout(barmode='group', height=400, template="plotly_white")
-st.plotly_chart(fig, use_container_width=True)
-
-# --- 5. ANALYSIS SECTION (สไตล์โต๊ะรก) ---
-with st.expander("🔍 อ่านบทวิเคราะห์ฉบับเต็ม"):
-    st.write(f"**หัวข้อ:** {match['news']}")
-    st.info("วิเคราะห์: เกมนี้ลิเวอร์พูลดูตื้อๆ ไปหน่อย โดยเฉพาะนาทีที่ 67 หลังจากถอดตัวรุกออกทำให้โมเมนตัมเปลี่ยนทันที...")
-
-# --- 6. VOTING SYSTEM (ไอเดียใหม่ที่คุณอยากได้) ---
+# --- 4. CHARTS (ใช้สี Red/Blue ตามต้นฉบับ) ---
 st.divider()
-st.subheader("🗳️ แฟนบอลคิดอย่างไร?")
-vote = st.radio("คุณเห็นด้วยกับการแก้เกมของโค้ชในนัดนี้ไหม?", ["เห็นด้วย", "ไม่เห็นด้วย", "เฉยๆ"])
-if st.button("ส่งคะแนนโหวต"):
-    st.success(f"ขอบคุณสำหรับคะแนนโหวต! (ระบบบันทึกว่าคุณเลือก: {vote})")
+col_left, col_right = st.columns([2, 1])
+
+with col_left:
+    st.subheader("📊 เปรียบเทียบสถิติทีม")
+    categories = list(match_info["stats"].keys())
+    lfc_vals = [v[0] for v in match_info["stats"].values()]
+    opp_vals = [v[1] for v in match_info["stats"].values()]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name='Liverpool', x=categories, y=lfc_vals, marker_color='#E31B23'))
+    fig.add_trace(go.Bar(name='Chelsea', x=categories, y=opp_vals, marker_color='#034694'))
+
+    fig.update_layout(
+        barmode='group',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        margin=dict(l=20, r=20, t=20, b=20),
+        height=350
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+with col_right:
+    st.subheader("🕵️ เจาะประเด็นร้อน")
+    st.warning("**นาทีที่ 67:** การเปลี่ยนตัวของสล็อตทำให้โมเมนตัมเปลี่ยน ทีมเสียสมดุลการครองบอลทันที")
+    st.info("**สถิติหลังเกม:** แม้ครองบอลน้อยกว่า แต่โอกาสทำประตูจะแจ้ง (Big Chance) มีเท่ากันที่ 2 ครั้ง")
+
+# --- 5. VOTING SYSTEM (ระบบที่คุณอยากได้เพิ่ม) ---
+st.divider()
+st.markdown("### 🗳️ แฟนบอลลิเวอร์พูลโหวต!")
+vote_col1, vote_col2 = st.columns([1, 1])
+
+with vote_col1:
+    choice = st.radio("คุณพอใจกับการจัดตัวนัดนี้ไหม?", ["พอใจมาก", "พอใจ", "ไม่ค่อยพอใจ", "ควรเปลี่ยนโค้ช"])
+    if st.button("ยืนยันการโหวต"):
+        st.balloons()
+        st.success(f"บันทึกคะแนนโหวต '{choice}' ของคุณเรียบร้อยแล้ว!")
+
+with vote_col2:
+    # โชว์กราฟผลโหวตจำลอง
+    st.write("ผลโหวตรวมขณะนี้")
+    st.progress(70, text="70% เห็นว่าควรเก็บนักเตะชุดนี้ไว้")
+    st.progress(30, text="30% เห็นว่าควรขายออก")
