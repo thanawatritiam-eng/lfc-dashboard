@@ -437,7 +437,8 @@ elif st.session_state.tab == "analysis":
 
         chtml = "".join([
             f'<div class="comment-item {"comment-item-red" if c.get("border") else ""}">'
-            f'<span class="{c["ucls"]}">{c["user"]}:</span> {c["text"]}</div>'
+            # ใช้ .get() เพื่อป้องกัน Error ถ้าหา Key ไม่เจอ
+f'<span class="{c.get("ucls", "comment-user-dark")}">{c.get("user", "Unknown")}:</span> {c.get("text", "")}</div>'
             for c in st.session_state.comments[:6]])
         st.markdown(chtml, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
