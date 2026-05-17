@@ -412,31 +412,37 @@ elif st.session_state.tab == "stats":
         tag, num_cls = style_map[qs[2]["style"]]
         st.markdown(f'{tag}<div class="{num_cls}">{qs[2]["value"]}</div><div class="stat-label">{qs[2]["label"]}</div></div>', unsafe_allow_html=True)
 
-        # ── Spotlight (from JSON) ──
-        spot_stats_html = ""
+        # ── Spotlight (from JSON) — build HTML string ก่อน render ครั้งเดียว ──
+        spot_rows = []
         for s in SPOT["stats"]:
-            spot_stats_html += f"""
-            <div style="display:flex;justify-content:space-between;margin-top:6px;">
-              <span style="font-size:13px;font-weight:600;color:#374151;">{s['label']}</span>
-              <span style="font-weight:800;color:#1e293b;">{s['value']}</span>
-            </div>"""
+            row = (
+                f'<div style="display:flex;justify-content:space-between;'
+                f'align-items:center;margin-top:6px;">'
+                f'<span style="font-size:13px;font-weight:600;color:#374151;">{s["label"]}</span>'
+                f'<span style="font-weight:800;color:#1e293b;">{s["value"]}</span>'
+                f'</div>'
+            )
             if s["pct"] is not None:
-                spot_stats_html += f'<div class="progress-wrap"><div class="progress-fill" style="width:{s["pct"]}%;"></div></div>'
+                row += (
+                    f'<div style="background:#e5e7eb;border-radius:9999px;'
+                    f'height:7px;margin:5px 0 10px;">'
+                    f'<div style="background:#C8102E;border-radius:9999px;'
+                    f'height:7px;width:{s["pct"]}%;"></div></div>'
+                )
+            spot_rows.append(row)
 
-        st.markdown(f"""
-        <div class="card card-gold-border" style="margin-top:12px;">
-          <div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:7px;">
-            🌟 Spotlight: {SPOT['name']} ({SPOT['age']} ปี)
-          </div>
-          <div style="color:#374151;font-size:13px;margin-bottom:10px;">
-            ดาวรุ่งที่โชว์ฟอร์มได้โดดเด่นที่สุดในแนวรุก ก่อนถูกเปลี่ยนตัวออกจนเกิดเสียงโห่
-          </div>
-          {spot_stats_html}
-          <div style="font-size:11px;color:#64748b;margin-top:8px;font-style:italic;">
-            {SPOT['note']}
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        spot_inner = "".join(spot_rows)
+        st.markdown(
+            f'<div class="card card-gold-border" style="margin-top:12px;">'
+            f'<div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:7px;">'
+            f'🌟 Spotlight: {SPOT["name"]} ({SPOT["age"]} ปี)</div>'
+            f'<div style="color:#374151;font-size:13px;margin-bottom:10px;">'
+            f'ดาวรุ่งที่โชว์ฟอร์มได้โดดเด่นที่สุดในแนวรุก ก่อนถูกเปลี่ยนตัวออกจนเกิดเสียงโห่</div>'
+            f'{spot_inner}'
+            f'<div style="font-size:11px;color:#64748b;margin-top:8px;font-style:italic;">'
+            f'{SPOT["note"]}</div></div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Row 2: Doughnut Possession (ใหม่ Phase 2) + Momentum ──
     dough_col, mom_col = st.columns([1, 2], gap="large")
