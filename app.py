@@ -612,11 +612,11 @@ if st.session_state.tab == "live":
             st.info("ยังไม่มีข้อมูลผลแมตช์ — กด Refresh ด้านล่าง")
 
         if st.button("🔄 Refresh ผล", key="refresh_fix"):
-    # ล้างคีย์แคชหลักตัวใหม่ เพื่อบังคับยิงหาข้อมูลล่าสุดจริงจากเซิร์ฟเวอร์
-    for k in ["_cache_all_fixtures_all", "_cache_all_fixtures_all_ts",
-              "_cache_live", "_cache_live_ts"]:
-        st.session_state.pop(k, None)
-    st.rerun()
+            # ต้องย่อหน้า (Tab) ถอยเข้ามาด้านในของบล็อก if ทั้งหมดตามนี้ครับ 👇
+            for k in ["_cache_all_fixtures_all", "_cache_all_fixtures_all_ts",
+                      "_cache_live", "_cache_live_ts"]:
+                st.session_state.pop(k, None)
+            st.rerun()
 
     with col_next:
         # ── สถิติ 5 แมตช์ล่าสุด ──
