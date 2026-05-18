@@ -44,14 +44,14 @@ COMPETITIONS = {
 def _api_headers() -> dict:
     return {
         "x-rapidapi-key":  st.secrets["api_football"]["key"],
-        "x-rapidapi-host": "v3.football.api-sports.io",
+        "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
     }
 
 def _get(endpoint: str, params: dict) -> dict | None:
     """raw GET — จัดการ error ให้ครบ"""
     try:
         r = requests.get(
-            f"https://v3.football.api-sports.io/{endpoint}",
+            f"https://api-football-v1.p.rapidapi.com/v3/{endpoint}",
             headers=_api_headers(),
             params=params,
             timeout=10,
