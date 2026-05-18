@@ -101,19 +101,30 @@ def fetch_last_fixtures(n: int = 5) -> list:
                 "season": SEASON,
                 "last":   n,
             })
-            if data:
-                results.extend(data.get("response", []))
-        # เรียงตาม date ล่าสุดก่อน
-        results.sort(key=lambda x: x["fixture"]["date"], reverse=True)
-        return results[:n]
-    return _cached("fixtures", CACHE_TTL_SEC, _fetch) or []
-
-def fetch_live_fixture() -> dict | None:
-    """แมตช์ที่กำลังเล่นอยู่ตอนนี้"""
-    def _fetch():
-        data = _get("fixtures", {"live": "all", "team": LIVERPOOL_ID})
-        if data and data.get("response"):
-            return data["response"][0]
+            @st.cache_data(ttl=CACHE_TTL_SEC)
+def fetch_fixtures_from_api():
+    """ดึงโปรแกรม/ผลการแข่งขันจาก API"""
+    url = f"{API_BASE}/fixtures"
+    headers = get_api_headers()
+    if not headers: return None
+    
+    # แก้ไข: ใช้ season แทน next เพื่อให้ผ่านเงื่อนไขสำหรับ Account ฟรี
+    querystring = {"team": str(LIVERPOOL_ID), "season": str(SEASON)} 
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+        res_json = response.json()
+        
+        # เพิ่มการตรวจสอบ: ถ้าบัญชีโดน Suspended หรือติดลิมิต ให้เตือนแทนแอปพัง
+        if "errors" in res_json and res_json["errors"]:
+            if isinstance(res_json["errors"], dict) and "access" in res_json["errors"]:
+                st.warning(f"⚠️ สัญญาณ API แดชบอร์ดขัดข้องชั่วคราว: {res_json['errors']['access']}")
+            else:
+                st.warning(f"⚠️ API Error: {res_json['errors']}")
+            return None
+            
+        return res_json
+    except Exception as e:
+        st.error(f"Error fetching fixtures: {e}")
         return None
     return _cached("live", LIVE_TTL_SEC, _fetch)
 
