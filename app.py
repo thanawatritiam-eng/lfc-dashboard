@@ -89,25 +89,46 @@ def _cached(name: str, ttl: int, fetch_fn):
         st.session_state[key_ts] = now
     return st.session_state.get(key)
 
-# ── Fetch Functions ──
-def fetch_last_fixtures(n: int = 5) -> list:
-    """ผลล่าสุด n แมตช์ของ Liverpool ทุก competition"""
+# ── Optimized Fetch Functions (ลดการยิง API ป้องกัน HTTP 429) ──
+
+def fetch_all_fixtures_data() -> list:
+    """ดึงข้อมูลแมตช์ทั้งหมดของฤดูกาลในครั้งเดียว เพื่อลดจำนวน Request"""
     def _fetch():
-        results = []
-        for league_id in COMPETITIONS:
-            data = _get("fixtures", {
-                "team":   LIVERPOOL_ID,
-                "league": league_id,
-                "season": SEASON,
-                "last":   n,
-            })
-            if data and data.get("response"):
-                results.extend(data["response"])
-        return results
-    return _cached("last_fixtures", CACHE_TTL_SEC, _fetch) or []
+        data = _get("fixtures", {
+            "team": LIVERPOOL_ID,
+            "season": SEASON
+        })
+        if data and data.get("response"):
+            return data["response"]
+        return []
+    return _cached("all_fixtures_all", CACHE_TTL_SEC, _fetch) or []
+
+def fetch_last_fixtures(n: int = 5) -> list:
+    """กรองผลการแข่งขันล่าสุด n แมตช์จากข้อมูลรวมด้วย Python (ไม่ต้องยิง API เพิ่ม)"""
+    all_fix = fetch_all_fixtures_data()
+    if not all_fix:
+        return []
+    # กรองเฉพาะแมตช์ที่แข่งจบไปแล้ว
+    past_fixtures = [f for f in all_fix if f["fixture"]["status"]["short"] in ["FT", "AET", "PEN"]]
+    # เรียงจากวันที่ล่าสุดไปอดีต
+    past_fixtures.sort(key=lambda f: f["fixture"]["date"], reverse=True)
+    return past_fixtures[:n]
+
+def fetch_next_fixture() -> dict | None:
+    """กรองหาแมตช์ถัดไปจากข้อมูลรวมด้วย Python (ไม่ต้องยิง API เพิ่ม)"""
+    all_fix = fetch_all_fixtures_data()
+    if not all_fix:
+        return None
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # กรองเฉพาะแมตช์ในอนาคตที่ยังมาไม่ถึง
+    upcoming = [f for f in all_fix if f["fixture"]["date"] > now_str]
+    if upcoming:
+        upcoming.sort(key=lambda f: f["fixture"]["date"])
+        return upcoming[0]
+    return None
 
 def fetch_live_fixture() -> dict | None:
-    """แมตช์ที่กำลังแข่งสด (ถ้ามี)"""
+    """แมตช์ที่กำลังแข่งสด (ยิงแยก 1 ครั้งเฉพาะวันที่มีแข่งจริง)"""
     def _fetch():
         data = _get("fixtures", {
             "team": LIVERPOOL_ID,
@@ -119,18 +140,18 @@ def fetch_live_fixture() -> dict | None:
     return _cached("live", LIVE_TTL_SEC, _fetch)
 
 def fetch_standings() -> dict:
-    """ตาราง Premier League + competitions อื่น"""
+    """ดึงตารางคะแนน (ปรับดึงเฉพาะพรีเมียร์ลีกหลัก เพื่อประหยัดโควตาไม่ให้ติด 429)"""
     def _fetch():
         out = {}
-        for league_id, name in COMPETITIONS.items():
-            data = _get("standings", {"league": league_id, "season": SEASON})
-            if data and data.get("response"):
-                out[name] = data["response"][0]["league"]["standings"][0]
+        # ดึงเฉพาะ Premier League (ID: 39) เพื่อตัดลูปยิง API ซ้ำซ้อนสำหรับลีกอื่นที่รูปแบบไม่ตรงกัน
+        data = _get("standings", {"league": 39, "season": SEASON})
+        if data and data.get("response"):
+            out["Premier League"] = data["response"][0]["league"]["standings"][0]
         return out
     return _cached("standings", CACHE_TTL_SEC, _fetch) or {}
 
 def fetch_player_stats(league_id: int = 39) -> list:
-    """สถิตินักเตะ Liverpool ใน PL"""
+    """สถิตินักเตะ Liverpool ในลีกล่าสุด (ยิง 1 ครั้ง)"""
     def _fetch():
         data = _get("players", {
             "team":   LIVERPOOL_ID,
@@ -140,7 +161,6 @@ def fetch_player_stats(league_id: int = 39) -> list:
         })
         if data:
             players = data.get("response", [])
-            # เรียงตาม goals + assists
             players.sort(
                 key=lambda p: (
                     p["statistics"][0]["goals"]["total"] or 0,
@@ -151,42 +171,6 @@ def fetch_player_stats(league_id: int = 39) -> list:
             return players[:8]
         return []
     return _cached("players", CACHE_TTL_SEC, _fetch) or []
-
-def fetch_next_fixture() -> dict | None:
-    """แมตช์ถัดไปของ Liverpool (ปรับปรุงแก้ไขเพื่อรองรับ Account แพ็กเกจฟรี)"""
-    def _fetch():
-        # ดึงตารางแข่งทั้งหมดของฤดูกาลมาแทน เพื่อเลี่ยงการใช้พารามิเตอร์ next ที่ติดล็อกของตัวฟรี
-        data = _get("fixtures", {
-            "team":   LIVERPOOL_ID,
-            "season": SEASON,
-        })
-        if data and data.get("response"):
-            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            # ค้นหาแมตช์ที่มีเวลาแข่งมากกว่าเวลาปัจจุบัน (แมตช์ในอนาคตที่ยังมาไม่ถึง)
-            upcoming = [f for f in data["response"] if f["fixture"]["date"] > now_str]
-            if upcoming:
-                # เรียงลำดับจากวันที่ใกล้ที่สุด แล้วดึงแมตช์ลำดับแรกสุดออกมาโชว์
-                upcoming.sort(key=lambda f: f["fixture"]["date"])
-                return upcoming[0]
-        return None
-    return _cached("next_fix", CACHE_TTL_SEC, _fetch)
-# ── Helpers ──
-def fmt_date(iso: str) -> str:
-    try:
-        dt = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        return dt.strftime("%d %b %Y %H:%M")
-    except Exception:
-        return iso
-
-def result_badge(home: int, away: int, team_home_id: int) -> tuple[str, str]:
-    """คืน (label, color) W/D/L"""
-    if home == away:
-        return "D", "#F6EB61"
-    if (home > away and team_home_id == LIVERPOOL_ID) or \
-       (away > home and team_home_id != LIVERPOOL_ID):
-        return "W", "#16a34a"
-    return "L", "#C8102E"
-
 # ══════════════════════════════════════════════════
 # GOOGLE SHEETS — Phase 3
 # ══════════════════════════════════════════════════
