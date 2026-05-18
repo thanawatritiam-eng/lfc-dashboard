@@ -101,30 +101,20 @@ def fetch_last_fixtures(n: int = 5) -> list:
                 "season": SEASON,
                 "last":   n,
             })
-            @st.cache_data(ttl=CACHE_TTL_SEC)
-def fetch_fixtures_from_api():
-    """ดึงโปรแกรม/ผลการแข่งขันจาก API"""
-    url = f"{API_BASE}/fixtures"
-    headers = get_api_headers()
-    if not headers: return None
-    
-    # แก้ไข: ใช้ season แทน next เพื่อให้ผ่านเงื่อนไขสำหรับ Account ฟรี
-    querystring = {"team": str(LIVERPOOL_ID), "season": str(SEASON)} 
-    try:
-        response = requests.get(url, headers=headers, params=querystring)
-        res_json = response.json()
-        
-        # เพิ่มการตรวจสอบ: ถ้าบัญชีโดน Suspended หรือติดลิมิต ให้เตือนแทนแอปพัง
-        if "errors" in res_json and res_json["errors"]:
-            if isinstance(res_json["errors"], dict) and "access" in res_json["errors"]:
-                st.warning(f"⚠️ สัญญาณ API แดชบอร์ดขัดข้องชั่วคราว: {res_json['errors']['access']}")
-            else:
-                st.warning(f"⚠️ API Error: {res_json['errors']}")
-            return None
-            
-        return res_json
-    except Exception as e:
-        st.error(f"Error fetching fixtures: {e}")
+            if data and data.get("response"):
+                results.extend(data["response"])
+        return results
+    return _cached("last_fixtures", CACHE_TTL_SEC, _fetch) or []
+
+def fetch_live_fixture() -> dict | None:
+    """แมตช์ที่กำลังแข่งสด (ถ้ามี)"""
+    def _fetch():
+        data = _get("fixtures", {
+            "team": LIVERPOOL_ID,
+            "live": "all"
+        })
+        if data and data.get("response"):
+            return data["response"][0]
         return None
     return _cached("live", LIVE_TTL_SEC, _fetch)
 
@@ -163,18 +153,23 @@ def fetch_player_stats(league_id: int = 39) -> list:
     return _cached("players", CACHE_TTL_SEC, _fetch) or []
 
 def fetch_next_fixture() -> dict | None:
-    """แมตช์ถัดไปของ Liverpool"""
+    """แมตช์ถัดไปของ Liverpool (ปรับปรุงแก้ไขเพื่อรองรับ Account แพ็กเกจฟรี)"""
     def _fetch():
+        # ดึงตารางแข่งทั้งหมดของฤดูกาลมาแทน เพื่อเลี่ยงการใช้พารามิเตอร์ next ที่ติดล็อกของตัวฟรี
         data = _get("fixtures", {
             "team":   LIVERPOOL_ID,
             "season": SEASON,
-            "next":   1,
         })
         if data and data.get("response"):
-            return data["response"][0]
+            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            # ค้นหาแมตช์ที่มีเวลาแข่งมากกว่าเวลาปัจจุบัน (แมตช์ในอนาคตที่ยังมาไม่ถึง)
+            upcoming = [f for f in data["response"] if f["fixture"]["date"] > now_str]
+            if upcoming:
+                # เรียงลำดับจากวันที่ใกล้ที่สุด แล้วดึงแมตช์ลำดับแรกสุดออกมาโชว์
+                upcoming.sort(key=lambda f: f["fixture"]["date"])
+                return upcoming[0]
         return None
     return _cached("next_fix", CACHE_TTL_SEC, _fetch)
-
 # ── Helpers ──
 def fmt_date(iso: str) -> str:
     try:
