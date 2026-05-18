@@ -39,7 +39,7 @@ COMPETITIONS = {
 }
 
 # ══════════════════════════════════════════════════
-# API-FOOTBALL LAYER  ← Phase 4
+# API-FOOTBALL LAYER  ← Phase 4 (RapidAPI Edition)
 # ══════════════════════════════════════════════════
 def _api_headers() -> dict:
     return {
@@ -88,6 +88,28 @@ def _cached(name: str, ttl: int, fetch_fn):
         st.session_state[key]    = data
         st.session_state[key_ts] = now
     return st.session_state.get(key)
+
+# ── ฟังก์ชันตัวช่วยแปลงข้อมูล (Helper Functions) สำหรับจัดหน้าผลบอล ──
+def fmt_date(iso_str: str) -> str:
+    """แปลงเวลาสากล ISO เป็นวันเวลาไทยอ่านง่าย"""
+    try:
+        dt = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        # ปรับเพิ่มเวลาเข้าสู่โซนเวลาไทย (+7 ชั่วโมง)
+        dt_th = dt.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
+        return dt_th.strftime("%d/%m/%Y %H:%M น.")
+    except:
+        return iso_str[:16]
+
+def result_badge(home_goals: int, away_goals: int, home_id: int) -> tuple[str, str]:
+    """คำนวณว่า ลิเวอร์พูล ชนะ(W) เสมอ(D) หรือ แพ้(L) เพื่อส่งกลับตัวอักษรและสีป้ายแสดงผล"""
+    if home_goals == away_goals:
+        return "D", "#ca8a04" # เสมอ - สีส้มทอง
+        
+    is_lfc_home = (home_id == LIVERPOOL_ID)
+    if home_goals > away_goals:
+        return ("W", "#16a34a") if is_lfc_home else ("L", "#C8102E")
+    else:
+        return ("L", "#C8102E") if is_lfc_home else ("W", "#16a34a")
 
 # ── Optimized Fetch Functions (ลดการยิง API ป้องกัน HTTP 429) ──
 
@@ -590,11 +612,11 @@ if st.session_state.tab == "live":
             st.info("ยังไม่มีข้อมูลผลแมตช์ — กด Refresh ด้านล่าง")
 
         if st.button("🔄 Refresh ผล", key="refresh_fix"):
-            for k in ["_cache_fixtures", "_cache_fixtures_ts",
-                      "_cache_live", "_cache_live_ts",
-                      "_cache_next_fix", "_cache_next_fix_ts"]:
-                st.session_state.pop(k, None)
-            st.rerun()
+    # ล้างคีย์แคชหลักตัวใหม่ เพื่อบังคับยิงหาข้อมูลล่าสุดจริงจากเซิร์ฟเวอร์
+    for k in ["_cache_all_fixtures_all", "_cache_all_fixtures_all_ts",
+              "_cache_live", "_cache_live_ts"]:
+        st.session_state.pop(k, None)
+    st.rerun()
 
     with col_next:
         # ── สถิติ 5 แมตช์ล่าสุด ──
