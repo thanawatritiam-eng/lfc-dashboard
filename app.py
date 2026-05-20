@@ -25,13 +25,18 @@ from google.generativeai.types import RequestOptions
 genai.configure(api_key=st.secrets["gemini_api_key"]["token"], transport='rest')
 
 def get_match_timeline_from_gemini(home_team, away_team, date):
-    import google.generativeai as genai
+    import requests
+    import json
     
-    # ตั้งค่า API Key
-    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
+    # 1. ดึง Token ออกมา
+    api_key = st.secrets["gemini_api_key"]["token"]
     
-    # ใช้ gemini-1.5-flash ได้ทันทีอย่างปลอดภัย
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 2. ยิงตรงหา Endpoint เวอร์ชัน v1 ที่เสถียรที่สุด ไม่ผ่าน SDK ตัวเก่าแล้ว
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
     
     prompt = f"""
     วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} 
@@ -41,13 +46,28 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
-    response = model.generate_content(prompt)
-    clean_text = response.text.replace("```json", "").replace("```", "").strip()
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
     try:
+        # ยิง HTTP POST ไปทวงข้อมูลมา
+        response = requests.post(url, headers=headers, json=payload)
+        res_data = response.json()
+        
+        # แกะเอาข้อความที่ Gemini ตอบกลับมา
+        ai_response_text = res_data['candidates'][0]['content']['parts'][0]['text']
+        
+        # คลีน Markdown ทิ้งเหมือนเดิม
+        clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
-    except json.JSONDecodeError:
-        st.error("⚠️ AI ไม่ได้ส่งค่ากลับมาเป็นรูปแบบ JSON ที่ถูกต้อง")
+        
+    except Exception as e:
+        st.error(f"⚠️ ยิงตรงก็ยังพังเพราะ: {e}")
+        # หากยังพังอีก ให้ลองพิมพ์ res_data ออกมาดูว่า Google มันบ่นอะไรใน Log
+        # st.write(res_data) 
         return []
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
