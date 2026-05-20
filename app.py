@@ -20,7 +20,7 @@ import google.generativeai as genai
 # 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
 def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
-    model = genai.GenerativeModel('gemini-1.0-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
