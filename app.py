@@ -28,6 +28,25 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
     return json.loads(response.text)
+
+with tab_timeline:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        
+        # เพิ่มปุ่มสำหรับสั่งให้ AI วิเคราะห์
+        if st.button("🤖 อัปเดตไทม์ไลน์อัตโนมัติด้วย AI"):
+            with st.spinner("Gemini กำลังอ่านข้อมูลแมตช์นี้..."):
+                try:
+                    # เรียกฟังก์ชัน AI
+                    ai_data = get_match_timeline_from_gemini(h_name, a_name, m_date)
+                    # บันทึกลง Sheet2 (ฟังก์ชันที่คุณเพิ่งเขียนไว้)
+                    save_timeline_to_sheet2(f"{h_name} vs {a_name}", ai_data)
+                    st.success("✨ บันทึกไทม์ไลน์ลง Sheet2 เรียบร้อยแล้ว!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
+
+        # ... (โค้ดแสดงผลไทม์ไลน์เดิมของคุณ)
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
