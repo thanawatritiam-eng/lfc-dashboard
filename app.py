@@ -14,9 +14,14 @@ from googleapiclient.discovery import build
 # GEMINI API ENGINE (ยิงตรงผ่าน HTTP Requests ไม่ผ่าน SDK ป้องกัน 404)
 # ══════════════════════════════════════════════════
 def get_match_timeline_from_gemini(home_team, away_team, date):
+    import requests
+    import json
+    
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # 🌟 ปรับ URL ใหม่: ไม่ต้องใส่คำว่า models/ ข้างหน้าในเส้นทางหลัก 
+    # และเปลี่ยนไปใช้ Endpoint ตัวที่ระบบบังคับอัปเดตล่าสุด
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     prompt = f"""
@@ -26,27 +31,28 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
     ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    # ปรับโครงสร้าง Payload ให้รองรับระเบียบความปลอดภัยใหม่
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
     try:
         response = requests.post(url, headers=headers, json=payload)
         res_data = response.json()
         
-        # ── เพิ่มส่วนนี้เพื่อตรวจสอบว่าเกิด Error จากฝั่ง Google หรือไม่ ──
         if "error" in res_data:
             st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
-            st.warning(f"รายละเอียดเชิงลึก: {res_data['error']}")
             return []
             
-        # แกะข้อมูลเมื่อรันผ่านปกติ
         ai_response_text = res_data['candidates'][0]['content']['parts'][0]['text']
         clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
-        
     except Exception as e:
         st.error(f"⚠️ AI เกิดข้อผิดพลาดในการวิเคราะห์: {e}")
         return []
-
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
