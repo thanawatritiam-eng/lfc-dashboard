@@ -32,7 +32,7 @@ LIVE_TTL_SEC  = 300           # 5 นาที (วันแข่ง)
 
 # competition IDs ที่ Liverpool เล่น
 COMPETITIONS = {
-    PL:  "Premier League",
+    39:  "Premier League",
     2:   "Champions League",
     45:  "FA Cup",
     48:  "League Cup",
