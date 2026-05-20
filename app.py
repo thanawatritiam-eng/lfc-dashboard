@@ -1033,7 +1033,22 @@ if 'current_away_name' not in locals():
     current_away_name = "Unknown"
 if 'current_m_date' not in locals():
     current_m_date = datetime.date.today().strftime("%Y-%m-%d")
+# 1. กำหนดค่าเริ่มต้นเพื่อให้ตัวแปรมีตัวตนตั้งแต่บรรทัดแรกที่รัน
+# เราจะดึงมาจาก md หรือค่าว่าง เพื่อกัน NameError
+if 'current_home_name' not in globals():
+    current_home_name = md["meta"].get("home_team", "Liverpool")
+if 'current_away_name' not in globals():
+    current_away_name = md["meta"].get("away_team", "Unknown")
+if 'current_m_date' not in globals():
+    current_m_date = md["meta"].get("date", "2024-01-01")
 
+# 2. กรณีถ้ามีการเลือก Dropdown (ถ้ามีฟังก์ชันดึงจาก API) 
+# ให้ตรวจสอบว่า selected_option มีค่าไหม ถ้าไม่มีก็ให้ใช้ค่าจาก md เดิม
+if 'selected_option' in locals() and selected_option:
+    _, current_match_obj, _ = selected_option
+    current_home_name = current_match_obj["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
+    current_away_name = current_match_obj["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
+    current_m_date = current_match_obj.get("utcDate", "").split("T")[0]
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
