@@ -30,12 +30,10 @@ SEASON        = 2024          # ปรับได้ใน match_data.json
 CACHE_TTL_SEC = 3600          # 1 ชั่วโมง (ประหยัด quota)
 LIVE_TTL_SEC  = 300           # 5 นาที (วันแข่ง)
 
-# competition IDs ที่ Liverpool เล่น
+# competition Codes ที่ค่ายใหม่รองรับ (ใช้ตัวย่อภาษาอังกฤษแทนตัวเลขครับ)
 COMPETITIONS = {
-    39:  "Premier League",
-    2:   "Champions League",
-    45:  "FA Cup",
-    48:  "League Cup",
+    "PL": "Premier League",    # 👈 พรีเมียร์ลีกใช้ "PL"
+    "CL": "Champions League"   # 👈 แชมเปียนส์ลีกใช้ "CL"
 }
 
 # ══════════════════════════════════════════════════
