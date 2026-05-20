@@ -521,7 +521,7 @@ with col_main:
         else:
             if st.button(f"🤖 สั่ง AI วิเคราะห์ไทม์ไลน์คู่ {match_title_key}", use_container_width=True):
                 # 💡 ตัวอย่างแนวการเยื้องในบล็อกปุ่มกด (นับจำนวน Tab หรือ Spacebar ให้ตรงกับบรรทัดบน)
-        with st.spinner("AI กำลังย้อนรอยดูเทปการแข่ง..."):
+            with st.spinner("AI กำลังย้อนรอยดูเทปการแข่ง..."):
             ai_timeline = get_match_timeline_from_gemini(home_team, away_team, date)
             
             # 🌟 บรรทัดที่ 526: จัดระยะให้ตรงกับ ai_timeline ด้านบนเป๊ะๆ ห้ามล้ำไปข้างหน้า
