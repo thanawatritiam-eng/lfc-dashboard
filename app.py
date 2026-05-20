@@ -19,7 +19,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # 🌟 นี่คือ URL ช่องทางพิเศษที่จะข้ามข้อจำกัด 404 ของคีย์พี่โดยตรง!
+    # 🌟 URL ตัวเก่ง ยิงตรงเข้าโมเดล Flash เท่านั้น
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -31,48 +31,31 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
-    # 🌟 สำคัญที่สุด: ปรับโครงสร้าง JSON Payload ให้เป็นระเบียบสากลที่ทุกระบบยอมรับ
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
     }
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=15)
         res_data = response.json()
         
-        # 1. เช็ค Error ตรงจาก Google
         if "error" in res_data:
-            # 💡 แผนสำรองพิเศษ: หากช่องทางหลักด้านบนโดนบล็อกอีก ระบบจะสลับไปยิงรุ่นเสถียรรอบโลกอัตโนมัติทันที
-            alt_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
-            alt_response = requests.post(alt_url, headers=headers, json=payload, timeout=15)
-            res_data = alt_response.json()
+            st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
+            return []
             
-            if "error" in res_data:
-                st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
-                return []
-            
-        # 2. แกะข้อมูลจาก Candidates
         if "candidates" in res_data and len(res_data["candidates"]) > 0:
             content = res_data["candidates"][0].get("content", {})
             parts = content.get("parts", [])
             if parts:
                 ai_response_text = parts[0].get("text", "")
-                # คลีนสตริง Markdown ออก
                 clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
                 return json.loads(clean_text)
                 
         return []
-        
     except Exception as e:
-        st.error(f"⚠️ ระบบประมวลผลล้มเหลว: {e}")
+        st.error(f"⚠️ AI เกิดข้อผิดพลาดในการแกะข้อมูล: {e}")
         return []
         
 # ══════════════════════════════════════════════════
