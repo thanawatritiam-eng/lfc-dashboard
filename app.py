@@ -384,6 +384,53 @@ def load_match_data() -> dict:
 
 md = load_match_data()
 
+import google.generativeai as genai
+
+def generate_match_timeline_via_gemini(home_team: str, away_team: str, match_date: str) -> dict | None:
+    """สั่งให้ AI Gemini ไปหาข้อมูลแมตช์และสร้างโครงสร้างไทม์ไลน์เหตุการณ์อัตโนมัติ"""
+    try:
+        # 1. ตั้งค่า API Key ของ Gemini
+        genai.configure(api_key=st.secrets["gemini_api_key"])
+        
+        # 2. เรียกใช้โมเดลรุ่นที่ฉลาดและเสถียรที่สุดในด้านการค้นหาข้อมูล
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # 3. ออกแบบ Prompt สั่งงานอย่างละเอียด (บังคับให้ออกมาเป็นภาษาไทยและรูปแบบที่กำหนด)
+        prompt = f"""
+        คุณคือผู้เชี่ยวชาญด้านสถิติฟุตบอลพรีเมียร์ลีก 
+        จงหาข้อมูลเหตุการณ์สำคัญรายนาทีของการแข่งขันระหว่าง {home_team} vs {away_team} ที่เตะเมื่อวันที่ {match_date} 
+        แล้วสร้างรายการเหตุการณ์ (Timeline) สำคัญในเกมนี้ขึ้นมา โดยครอบคลุม:
+        - การทำประตู (ยิงนาทีไหน ใครยิง ใครแอสซิสต์)
+        - ใบเหลือง/ใบแดง (ใครโดน นาทีไหน)
+        - การเปลี่ยนตัวผู้เล่น (ใครเข้า ใครออก นาทีไหน)
+        
+        ข้อมูลทั้งหมดต้องเป็น ภาษาไทย และห้ามแต่งข้อมูลขึ้นมาเองเด็ดขาด ถ้าไม่มีข้อมูลให้ใช้เหตุการณ์ภาพรวมหลักๆ
+        
+        จงตอบกลับมาเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:
+        {{
+          "timeline": [
+            {{
+              "minute": "นาที เช่น 14'",
+              "title": "หัวข้อสั้นๆ เช่น ⚽ GOAL! ({home_team[:3].upper()}) หรือ 🟨 YELLOW CARD",
+              "detail": "รายละเอียดเป็นภาษาไทย สามารถใช้แท็ก <b>ชื่อนักเตะ</b> เพื่อความสวยงามได้"
+            }}
+          ]
+        }}
+        """
+        
+        # 4. ส่งคำสั่งโดยบังคับให้ส่งกลับมาเป็น JSON ชัวร์ๆ ไม่ติดข้อความคุยเล่นของ AI
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        # 5. แปลงข้อความที่รีเทิร์นกลับมาให้เป็น Dictionary ของ Python
+        result_json = json.loads(response.text)
+        return result_json
+        
+    except Exception as e:
+        st.warning(f"⚠️ ไม่สามารถเจนไทม์ไลน์ผ่าน Gemini ได้: {e}")
+        return None
 # ══════════════════════════════════════════════════
 # INJECT CUSTOM CSS — Phase 1
 # ══════════════════════════════════════════════════
