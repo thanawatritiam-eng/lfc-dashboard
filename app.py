@@ -117,86 +117,113 @@ def result_badge(home_goals: int, away_goals: int, home_id: int) -> tuple[str, s
 
 # ── Optimized Fetch Functions (ลดการยิง API ป้องกัน HTTP 429) ──
 
+# ── ฟังก์ชันดึงข้อมูลการแข่งขัน (แปลงสำหรับ Football-Data.org) ──
 def fetch_all_fixtures_data() -> list:
-    """ดึงข้อมูลแมตช์ทั้งหมดของฤดูกาลในครั้งเดียว เพื่อลดจำนวน Request"""
+    """ดึงข้อมูลแมตช์ทั้งหมดของ Liverpool จาก Football-Data.org"""
     def _fetch():
-        data = _get("fixtures", {
-            "team": LIVERPOOL_ID,
-            "season": SEASON
-        })
-        if data and data.get("response"):
-            return data["response"]
+        # ค่ายใหม่ดึงแมตช์ของทีมผ่าน endpoint: teams/{id}/matches
+        data = _get(f"teams/{LIVERPOOL_ID}/matches")
+        if data and data.get("matches"):
+            # แปลงโครงสร้างให้เข้ากับ UI เดิมบางส่วน หรือส่งก้อน matches ออกไป
+            return data["matches"]
         return []
     return _cached("all_fixtures_all", CACHE_TTL_SEC, _fetch) or []
 
 def fetch_last_fixtures(n: int = 5) -> list:
-    """กรองผลการแข่งขันล่าสุด n แมตช์จากข้อมูลรวมด้วย Python (ไม่ต้องยิง API เพิ่ม)"""
+    """กรองผลการแข่งขันล่าสุด n แมตช์จากข้อมูลรวมด้วย Python"""
     all_fix = fetch_all_fixtures_data()
     if not all_fix:
         return []
-    # กรองเฉพาะแมตช์ที่แข่งจบไปแล้ว
-    past_fixtures = [f for f in all_fix if f["fixture"]["status"]["short"] in ["FT", "AET", "PEN"]]
+    # ค่ายใหม่ใช้สถานะเป็น "FINISHED" แทน "FT"
+    past_fixtures = [f for f in all_fix if f.get("status") == "FINISHED"]
     # เรียงจากวันที่ล่าสุดไปอดีต
-    past_fixtures.sort(key=lambda f: f["fixture"]["date"], reverse=True)
-    return past_fixtures[:n]
+    past_fixtures.sort(key=lambda f: f.get("utcDate", ""), reverse=True)
+    
+    # แปลงโครงสร้างชั้นข้อมูลชั่วคราวเพื่อให้กล่อง UI เดิมอ่านค่าได้โดยไม่พัง
+    formatted = []
+    for f in past_fixtures[:n]:
+        formatted.append({
+            "fixture": {"date": f.get("utcDate"), "status": {"short": "FT"}},
+            "teams": {
+                "home": {"name": f["homeTeam"]["name"], "id": f["homeTeam"]["id"]},
+                "away": {"name": f["awayTeam"]["name"], "id": f["awayTeam"]["id"]}
+            },
+            "goals": {"home": f["score"]["fullTime"]["home"], "away": f["score"]["fullTime"]["away"]}
+        })
+    return formatted
 
 def fetch_next_fixture() -> dict | None:
-    """กรองหาแมตช์ถัดไปจากข้อมูลรวมด้วย Python (ไม่ต้องยิง API เพิ่ม)"""
+    """กรองหาแมตช์ถัดไปจากข้อมูลรวมด้วย Python"""
     all_fix = fetch_all_fixtures_data()
     if not all_fix:
         return None
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    # กรองเฉพาะแมตช์ในอนาคตที่ยังมาไม่ถึง
-    upcoming = [f for f in all_fix if f["fixture"]["date"] > now_str]
+    # ค่ายใหม่ใช้สถานะ "TIMED" หรือ "SCHEDULED" สำหรับแมตช์ในอนาคต
+    upcoming = [f for f in all_fix if f.get("status") in ["TIMED", "SCHEDULED"]]
     if upcoming:
-        upcoming.sort(key=lambda f: f["fixture"]["date"])
-        return upcoming[0]
+        upcoming.sort(key=lambda f: f.get("utcDate", ""))
+        nxt = upcoming[0]
+        return {
+            "fixture": {"date": nxt.get("utcDate"), "venue": "Anfield"}, # ใส่ค่าเริ่มต้นสนามไว้
+            "teams": {
+                "home": {"name": nxt["homeTeam"]["name"]},
+                "away": {"name": nxt["awayTeam"]["name"]}
+            }
+        }
     return None
 
 def fetch_live_fixture() -> dict | None:
-    """แมตช์ที่กำลังแข่งสด (ยิงแยก 1 ครั้งเฉพาะวันที่มีแข่งจริง)"""
-    def _fetch():
-        data = _get("fixtures", {
-            "team": LIVERPOOL_ID,
-            "live": "all"
-        })
-        if data and data.get("response"):
-            return data["response"][0]
+    """กรองหาแมตช์ที่กำลังแข่งขันอยู่ (LIVE)"""
+    all_fix = fetch_all_fixtures_data()
+    if not all_fix:
         return None
-    return _cached("live", LIVE_TTL_SEC, _fetch)
+    # ค่ายใหม่ใช้สถานะ "IN_PLAY" หรือ "PAUSED" ตอนเตะอยู่
+    live_matches = [f for f in all_fix if f.get("status") in ["IN_PLAY", "PAUSED"]]
+    if live_matches:
+        lm = live_matches[0]
+        return {
+            "fixture": {"status": {"short": "LIVE"}},
+            "teams": {
+                "home": {"name": lm["homeTeam"]["name"]},
+                "away": {"name": lm["awayTeam"]["name"]}
+            },
+            "goals": {"home": lm["score"]["fullTime"]["home"], "away": lm["score"]["fullTime"]["away"]}
+        }
+    return None
 
+# ── ฟังก์ชันดึงตารางคะแนน (แปลงสำหรับ Football-Data.org) ──
 def fetch_standings() -> dict:
-    """ดึงตารางคะแนน (ปรับดึงเฉพาะพรีเมียร์ลีกหลัก เพื่อประหยัดโควตาไม่ให้ติด 429)"""
+    """ดึงตารางคะแนนพรีเมียร์ลีกจาก Football-Data.org"""
     def _fetch():
         out = {}
-        # ดึงเฉพาะ Premier League (ID: 39) เพื่อตัดลูปยิง API ซ้ำซ้อนสำหรับลีกอื่นที่รูปแบบไม่ตรงกัน
-        data = _get("standings", {"league": 39, "season": SEASON})
-        if data and data.get("response"):
-            out["Premier League"] = data["response"][0]["league"]["standings"][0]
+        # ค่ายใหม่ใช้ลิงก์นี้ในการดึงตารางพรีเมียร์ลีก
+        data = _get("competitions/PL/standings")
+        if data and data.get("standings"):
+            # ดึงตารางคะแนนแบบรวม (Total Standing) ก้อนแรกออกมา
+            raw_table = data["standings"][0]["table"]
+            
+            # แปลงหน้าตาข้อมูลให้เหมือนค่ายเก่า เพื่อให้ฟังก์ชันวาดตารางตัวเดิมทำงานต่อได้
+            formatted_table = []
+            for item in raw_table:
+                formatted_table.append({
+                    "rank": item["position"],
+                    "team": {"name": item["team"]["name"], "id": item["team"]["id"], "logo": ""},
+                    "points": item["points"],
+                    "all": {
+                        "played": item["playedGames"],
+                        "win": item["won"],
+                        "draw": item["draw"],
+                        "lose": item["lost"],
+                        "goals": {"for": item["goalsFor"], "against": item["goalsAgainst"]}
+                    }
+                })
+            out["Premier League"] = formatted_table
         return out
     return _cached("standings", CACHE_TTL_SEC, _fetch) or {}
 
-def fetch_player_stats(league_id: int = 39) -> list:
-    """สถิตินักเตะ Liverpool ในลีกล่าสุด (ยิง 1 ครั้ง)"""
-    def _fetch():
-        data = _get("players", {
-            "team":   LIVERPOOL_ID,
-            "league": league_id,
-            "season": SEASON,
-            "page":   1,
-        })
-        if data:
-            players = data.get("response", [])
-            players.sort(
-                key=lambda p: (
-                    p["statistics"][0]["goals"]["total"] or 0,
-                    p["statistics"][0]["goals"]["assists"] or 0,
-                ),
-                reverse=True,
-            )
-            return players[:8]
-        return []
-    return _cached("players", CACHE_TTL_SEC, _fetch) or []
+# ── ฟังก์ชันสถิตินักเตะ ──
+def fetch_player_stats(league_id: str = "PL") -> list:
+    """ในแพ็กเกจฟรีของค่ายใหม่จะไม่รองรับการดึงสถิตินักเตะรายสโมสรตรงๆ ขอส่งค่าว่างกลับไปก่อนเพื่อไม่ให้ UI พัง"""
+    return []
 # ══════════════════════════════════════════════════
 # GOOGLE SHEETS — Phase 3
 # ══════════════════════════════════════════════════
