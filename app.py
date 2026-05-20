@@ -303,7 +303,10 @@ def fetch_comments() -> list:
 
 def push_comment(user: str, text: str, border: bool = False) -> bool:
     try:
-        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # 💡 สร้างโซนเวลาประเทศไทย (UTC + 7 ชั่วโมง) และดึงเวลาปัจจุบันให้ตรงเป๊ะ
+        tz_th = datetime.timezone(datetime.timedelta(hours=7))
+        ts = datetime.datetime.now(tz_th).strftime("%Y-%m-%d %H:%M:%S")
+        
         get_sheets_service().values().append(
             spreadsheetId=get_sheet_id(),
             range=f"{SHEET_TAB}!A:D",
