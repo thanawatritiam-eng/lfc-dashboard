@@ -157,13 +157,16 @@ def fetch_next_fixture() -> dict | None:
     all_fix = fetch_all_fixtures_data()
     if not all_fix:
         return None
-    # ค่ายใหม่ใช้สถานะ "TIMED" หรือ "SCHEDULED" สำหรับแมตช์ในอนาคต
+    # ค่ายใหม่ใช้สถานะ "TIMED" หรือ "SCHEDULED" สำหรับแมตช์ในอนาค
     upcoming = [f for f in all_fix if f.get("status") in ["TIMED", "SCHEDULED"]]
     if upcoming:
         upcoming.sort(key=lambda f: f.get("utcDate", ""))
         nxt = upcoming[0]
         return {
-            "fixture": {"date": nxt.get("utcDate"), "venue": "Anfield"}, # ใส่ค่าเริ่มต้นสนามไว้
+            "fixture": {
+                "date": nxt.get("utcDate"), 
+                "venue": {"name": "Anfield"}  # 👈 แก้ตรงนี้! ครอบดิคชันนารีเพิ่ม เพื่อให้บรรทัด 604 ใช้ .get("name") ได้โดยไม่พัง
+            }, 
             "teams": {
                 "home": {"name": nxt["homeTeam"]["name"]},
                 "away": {"name": nxt["awayTeam"]["name"]}
