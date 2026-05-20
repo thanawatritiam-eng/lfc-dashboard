@@ -19,30 +19,37 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # 🌟 URL ตัวเก่ง ยิงตรงเข้าโมเดล Flash เท่านั้น
+    # 🌟 อัปเกรดเป็นรุ่น 2.5-flash ล่าสุดที่กูเกิลรองรับ ไม่โดนลอยแพแน่นอน
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
+    # 🌟 ปรับ Prompt ใหม่ บังคับดึง Timeline ค้นหาความจริง และสั่งห้ามมันบอกว่าแมตช์ยังไม่เกิด
     prompt = f"""
-    ค้นหาข้อมูล Timeline (ลำดับเหตุการณ์จริง) ของการแข่งขันฟุตบอลระหว่าง {home_team} พบ {away_team} ที่แข่งขันในวันที่ {date}
-    ให้ดึงเฉพาะข้อมูลเหตุการณ์สำคัญที่เกิดขึ้นจริงในเกมเท่านั้น (อ้างอิงตามสถิติการแข่งขันจริง) เช่น:
+    ค้นหาข้อมูล Timeline (ลำดับเหตุการณ์จริง) ของการแข่งขันฟุตบอลในอดีตระหว่างทีม {home_team} พบ {away_team} ซึ่งแข่งขันเสร็จสิ้นไปแล้วในวันที่ {date} (รูปแบบ YYYY-MM-DD)
+    ให้ดึงเฉพาะข้อมูลเหตุการณ์สำคัญที่เกิดขึ้นจริงในเกมเท่านั้น (อ้างอิงตามสถิติการแข่งขันจริงของแมตช์นี้) เช่น:
     - การเช็ค VAR (เช่น ยกเลิกลูกโทษ, ริบประตู)
     - การเปลี่ยนตัวผู้เล่น (ระบุชื่อคนเข้า และคนออก)
     - การทำประตู (ใครยิง, ใครแอสซิสต์)
     - ใบเหลือง / ใบแดง
     
     ตอบกลับเป็นภาษาไทย ในรูปแบบ JSON เท่านั้น ตามโครงสร้างนี้: 
-    [ {{"minute": "นาที (เช่น 90', 90+1')", "title": "ประเภทเหตุการณ์", "detail": "รายละเอียด (เช่น ไม่ได้ลูกโทษ, เข้า: เทรย์ ไนโอนี ออก: เจเรมี ฟริมปง)"}} ]
+    [ {{"minute": "นาที (เช่น 45', 90+2')", "title": "ประเภทเหตุการณ์", "detail": "รายละเอียด (เช่น ไม่ได้ลูกโทษ, เข้า: ดาร์วิน นูเญซ ออก: ดิโอโก โชตา)"}} ]
     
-    *เงื่อนไขสำคัญ:
-    1. หากแมตช์นี้ยังไม่แข่งขัน หรือหาข้อมูลเหตุการณ์จริงไม่พบ ให้ตอบกลับเป็น [ {{"minute": "-", "title": "ไม่มีข้อมูล", "detail": "ยังไม่พบข้อมูลไทม์ไลน์การแข่งขันจริงของแมตช์นี้"}} ]
+    *เงื่อนไขสำคัญมาก:
+    1. ห้ามตอบว่าแมตช์ยังไม่เกิดขึ้น หรือทำนายอนาคตไม่ได้เด็ดขาด เพราะนี่คือข้อมูลแมตช์ในอดีตที่เตะจบไปแล้ว ให้ค้นหาผลการแข่งจริงจากฐานข้อมูลของคุณมาตอบเท่านั้น
     2. ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
     payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
     }
     
     try:
@@ -62,8 +69,9 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
                 return json.loads(clean_text)
                 
         return []
+        
     except Exception as e:
-        st.error(f"⚠️ AI เกิดข้อผิดพลาดในการแกะข้อมูล: {e}")
+        st.error(f"⚠️ ระบบประมวลผลล้มเหลว: {e}")
         return []
         
 # ══════════════════════════════════════════════════
@@ -506,27 +514,51 @@ with col_main:
         
         match_title_key = f"{current_home_name} vs {current_away_name}"
         
-        # 1. ปุ่มสั่ง AI วิเคราะห์ (ล้างลอจิกเก่าที่พังออกหมดแล้ว)
+        # 1. เงื่อนไขเช็คสถานะแมตช์
         if m_status != "FINISHED":
-            st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะเปิดให้ AI วิเคราะห์เหตุการณ์ได้หลังจบเกมครับ")
+            # 🌟 จัดเต็ม! ตัวหนังสือใหญ่ยักษ์ สีสันสดใส กระพริบวิบวับ ล่อตาล่อใจแฟนบอล
+            st.markdown("""
+            <div style="text-align: center; padding: 30px; background-color: #1e293b; border-radius: 12px; border: 3px dashed #ff0055; margin: 15px 0; box-shadow: 0 0 15px rgba(255,0,85,0.4);">
+                <h1 class="blink-text" style="font-size: 3.5rem; font-weight: 900; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                    🚨 อดใจรอก่อนนะจ๊ะแฟนหงส์! 🚨
+                </h1>
+                <p style="color: #cbd5e1; font-size: 1.4rem; margin-top: 15px; font-weight: bold;">
+                    ⚽ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน ระบบจะเปิดให้ AI ค้นหาไทม์ไลน์ได้หลังจบเกมครับ ⚽
+                </p>
+            </div>
+            <style>
+            @keyframes blinker {
+                0% { opacity: 1; color: #ff0055; transform: scale(1); }
+                25% { color: #38bdf8; }
+                50% { opacity: 0.2; color: #eab308; transform: scale(1.02); }
+                75% { color: #4ade80; }
+                100% { opacity: 1; color: #ff0055; transform: scale(1); }
+            }
+            .blink-text {
+                animation: blinker 1.2s linear infinite;
+            }
+            </style>
+            """, unsafe_allow_html=True)
         else:
-            if st.button(f"🤖 สั่ง AI วิเคราะห์ไทม์ไลน์คู่ {match_title_key}", use_container_width=True):
-                with st.spinner("Gemini กำลังเจาะลึกแมตช์และบันทึกลงฐานข้อมูล Sheet2..."):
-                    # 🌟 เรียกใช้ฟังก์ชันตัวใหม่ล่าสุด ไม่วิ่งไปหาฟังก์ชันโบราณข้างล่างแล้ว
+            # แก้ไขเรื่องการย่อหน้าพัง และเปลี่ยนชื่อตัวแปรให้วิ่งไปหา Combo Box หลักของแอปจริง
+            if st.button(f"🤖 สั่ง AI ค้นหาไทม์ไลน์คู่ {match_title_key}", use_container_width=True):
+                with st.spinner("AI กำลังค้นหาสถิติและย้อนรอยดูเทปการแข่งจริง..."):
                     ai_timeline = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
                     if ai_timeline:
                         save_timeline_to_sheet2(match_title_key, ai_timeline)
-                        st.success("✨ AI สรุปประมวลผลและอัปเดตลง Sheet2 สำเร็จ!")
+                        st.success("✨ AI สรุปประมวลผลและบันทึกลง Google Sheets (Sheet2) สำเร็จ!")
                         st.rerun()
+                    else:
+                        st.error("❌ ไม่สามารถดึงข้อมูลไทม์ไลน์จาก AI ได้ กรุณาลองกดใหมู่อีกครั้ง")
             
             st.markdown("---")
             
-            # 2. ดึงข้อมูลไทม์ไลน์มาแสดงผล (ย่อหน้าตรงเป๊ะ ไม่ขึ้น IndentationError แน่นอน)
+            # 2. ดึงข้อมูลจากฐานข้อมูล Google Sheets มาโชว์
             db_timeline = fetch_timeline_from_sheet2(match_title_key)
             is_json_match = (md["meta"]["away_team"].lower() in current_away_name.lower()) or (md["meta"]["home_team"].lower() in current_home_name.lower())
             
             if db_timeline:
-                st.info("📊 ข้อมูลไทม์ไลน์นี้ดึงสดมาจาก Google Sheets (Sheet2) ที่ AI วิเคราะห์ไว้")
+                st.info(f"📊 ข้อมูลไทม์ไลน์ดึงสดมาจาก Google Sheets (Sheet2) ของคู่ {match_title_key}")
                 for item in db_timeline:
                     st.markdown(f'<div class="timeline-item"><div class="tl-time">{item["minute"]}</div><div class="tl-content"><b>{item["title"]}</b><div class="comment-text">{item["detail"]}</div></div></div>', unsafe_allow_html=True)
             elif is_json_match and md.get("timeline"):
@@ -534,7 +566,7 @@ with col_main:
                 for item in md["timeline"]:
                     st.markdown(f'<div class="timeline-item"><div class="tl-time">{item["minute"]}</div><div class="tl-content"><b>{item["title"]}</b><div class="comment-text">{item["detail"]}</div></div></div>', unsafe_allow_html=True)
             else:
-                st.warning("💡 แมตช์นี้ยังไม่มีข้อมูลไทม์ไลน์ในระบบ กดปุ่มด้านบนเพื่อให้ AI ช่วยวิเคราะห์สร้างข้อมูลใหม่ได้เลยครับ")
+                st.warning("💡 แมตช์นี้ยังไม่มีข้อมูลไทม์ไลน์ในระบบ กดปุ่มด้านบนเพื่อให้ AI ช่วยไปค้นหาข้อมูลใหม่ได้เลยครับ")
             
         st.markdown('</div>', unsafe_allow_html=True)
             
