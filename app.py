@@ -363,9 +363,11 @@ def fetch_comments() -> list:
 # LOCAL DATA ENGINE — Phase 2
 # ══════════════════════════════════════════════════
 def load_match_data() -> dict:
-    """โหลดข้อมูลไฟล์ JSON พร้อมระบบ Safe Guard ป้องกันไฟล์พังล่ม 100%"""
-    # โครงสร้างสำรองเผื่อไฟล์พัง หน้าเว็บจะยังเปิดขึ้นมาได้ปลอดภัย
-    default_data = {
+    p = pathlib.Path("match_data.json")
+    if p.exists():
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {
         "meta": {
             "home_team": "Liverpool", "away_team": "Chelsea",
             "home_score": 0, "away_score": 0,
@@ -379,68 +381,9 @@ def load_match_data() -> dict:
         "analysis": {"title": "", "body": "", "quote": ""},
         "rival_compare": []
     }
-    
-    p = pathlib.Path("match_data.json")
-    if p.exists():
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            # 🔥 ถ้าไฟล์ JSON พัง พิมพ์ syntax ผิด หรือไฟล์ว่างเปล่า ให้พ่น Warning และดึงค่า default ทันที
-            st.warning("⚠️ พบข้อผิดพลาดในไฟล์ match_data.json (ฟอร์แมตไม่ถูกต้อง) ระบบเปิดใช้งานโครงสร้างสำรองชั่วคราวให้แล้วครับ เพื่อป้องกันแอปพัง")
-            return default_data
-        except Exception as e:
-            st.warning(f"⚠️ เกิดข้อผิดพลาดอื่นในการโหลด JSON: {e}")
-            return default_data
-    return default_data
 
-import google.generativeai as genai
+md = load_match_data()
 
-def generate_match_timeline_via_gemini(home_team: str, away_team: str, match_date: str) -> dict | None:
-    """สั่งให้ AI Gemini ไปหาข้อมูลแมตช์และสร้างโครงสร้างไทม์ไลน์เหตุการณ์อัตโนมัติ"""
-    try:
-        # 1. ตั้งค่า API Key ของ Gemini
-        genai.configure(api_key=st.secrets["gemini_api_key"])
-        
-        # 2. เรียกใช้โมเดลรุ่นที่ฉลาดและเสถียรที่สุดในด้านการค้นหาข้อมูล
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # 3. ออกแบบ Prompt สั่งงานอย่างละเอียด (บังคับให้ออกมาเป็นภาษาไทยและรูปแบบที่กำหนด)
-        prompt = f"""
-        คุณคือผู้เชี่ยวชาญด้านสถิติฟุตบอลพรีเมียร์ลีก 
-        จงหาข้อมูลเหตุการณ์สำคัญรายนาทีของการแข่งขันระหว่าง {home_team} vs {away_team} ที่เตะเมื่อวันที่ {match_date} 
-        แล้วสร้างรายการเหตุการณ์ (Timeline) สำคัญในเกมนี้ขึ้นมา โดยครอบคลุม:
-        - การทำประตู (ยิงนาทีไหน ใครยิง ใครแอสซิสต์)
-        - ใบเหลือง/ใบแดง (ใครโดน นาทีไหน)
-        - การเปลี่ยนตัวผู้เล่น (ใครเข้า ใครออก นาทีไหน)
-        
-        ข้อมูลทั้งหมดต้องเป็น ภาษาไทย และห้ามแต่งข้อมูลขึ้นมาเองเด็ดขาด ถ้าไม่มีข้อมูลให้ใช้เหตุการณ์ภาพรวมหลักๆ
-        
-        จงตอบกลับมาเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:
-        {{
-          "timeline": [
-            {{
-              "minute": "นาที เช่น 14'",
-              "title": "หัวข้อสั้นๆ เช่น ⚽ GOAL! ({home_team[:3].upper()}) หรือ 🟨 YELLOW CARD",
-              "detail": "รายละเอียดเป็นภาษาไทย สามารถใช้แท็ก <b>ชื่อนักเตะ</b> เพื่อความสวยงามได้"
-            }}
-          ]
-        }}
-        """
-        
-        # 4. ส่งคำสั่งโดยบังคับให้ส่งกลับมาเป็น JSON ชัวร์ๆ ไม่ติดข้อความคุยเล่นของ AI
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
-        # 5. แปลงข้อความที่รีเทิร์นกลับมาให้เป็น Dictionary ของ Python
-        result_json = json.loads(response.text)
-        return result_json
-        
-    except Exception as e:
-        st.warning(f"⚠️ ไม่สามารถเจนไทม์ไลน์ผ่าน Gemini ได้: {e}")
-        return None
 # ══════════════════════════════════════════════════
 # INJECT CUSTOM CSS — Phase 1
 # ══════════════════════════════════════════════════
@@ -525,93 +468,24 @@ st.markdown(
 col_main, col_side = st.columns([2, 1])
 
 with col_main:
-    # ── BANNER MATCHWEEK & SCORE (ปรับปรุงดึงแมตช์ทั้งฤดูกาล + ระบุบ้านใครอัตโนมัติ) ──
-    all_fixtures = fetch_all_fixtures_data()
-    
-    if all_fixtures:
-        # เรียงจากนัดแรกต้นฤดูกาล ไปจนถึงนัดสุดท้ายของปี
-        all_fixtures.sort(key=lambda x: x.get("utcDate", ""))
-        
-        # สร้างตัวเลือกในกล่อง Dropdown
-        fixture_options = []
-        for index, fx in enumerate(all_fixtures):
-            home_t = fx["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
-            away_t = fx["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
-            status = " (จบเกมแล้ว)" if fx.get("status") == "FINISHED" else " (ยังไม่แข่ง)"
-            
-            # เช่น "นัดที่ 8: Liverpool vs Chelsea (จบเกมแล้ว)"
-            option_text = f"นัดที่ {index + 1}: {home_t} vs {away_t}{status}"
-            fixture_options.append((option_text, fx, index + 1))
-            
-        # สร้างกล่องคอมโบสำหรับการเลือกแมตช์บนหน้าเว็บ
-        selected_option = st.selectbox(
-            "📅 เลือกแมตช์ที่ต้องการดูข้อมูลในฤดูกาลนี้ :",
-            options=fixture_options,
-            format_func=lambda x: x[0],
-            index=7  # ตั้งค่าเป็นเลข 7 เพื่อให้เปิดหน้าเว็บมาแล้วล็อกอยู่ที่ นัดที่ 8 (Liverpool vs Chelsea) เสมอตามคอนเทนต์ในใจกลางเพจของคุณ
-        )
-        
-        # ดึงข้อมูลแมตช์ที่แฟนบอลเลือก
-        _, current_match, match_num = selected_option
-        
-        h_name = current_match["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        a_name = current_match["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        comp_name = current_match.get("competition", {}).get("name", "Premier League")
-        m_status = current_match.get("status", "")
-        m_date = fmt_date(current_match.get("utcDate", ""))
-        
-        # 🏟️ ระบบตรวจสอบสนามเตะและบอกว่าบ้านใครโดยอัตโนมัติ
-        venue_info = f"🏟️ แข่งที่สนามของสโมสร {h_name} (บ้านของ {h_name})"
-        
-        # จัดการสีสันของตัวอักษรทีมลิเวอร์พูลให้เด่นด้วยสีแดง
-        h_color = "#C8102E" if "Liverpool" in h_name else "#94a3b8"
-        a_color = "#C8102E" if "Liverpool" in a_name else "#94a3b8"
-        
-        # ตรวจสอบว่าแมตช์แข่งเสร็จหรือยัง เพื่อแยกแสดงคะแนนกับเวลาเตะ
-        if m_status == "FINISHED":
-            h_score = current_match["score"]["fullTime"]["home"]
-            a_score = current_match["score"]["fullTime"]["away"]
-            sub_title_text = f"{comp_name} — นัดที่ {match_num} (แข่งขันเสร็จสิ้น)"
-        else:
-            h_score = "-"
-            a_score = "-"
-            sub_title_text = f"⏳ {comp_name} — โปรแกรมนัดที่ {match_num} (ยังไม่ได้แข่งขัน)"
-            
-        st.markdown(
-            f'<div class="score-banner">'
-            f'  <div class="score-team" style="color:{h_color}; text-align:right;">{h_name}</div>'
-            f'  <div>'
-            f'    <div class="score-vs">{sub_title_text}</div>'
-            f'    <div style="display:flex; align-items:center; justify-content:center;">'
-            f'      <span class="score-number">{h_score}</span>'
-            f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
-            f'      <span class="score-number">{a_score}</span>'
-            f'    </div>'
-            f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">⏰ เวลาเตะ: {m_date} | {venue_info}</div>'
-            f'  </div>'
-            f'  <div class="score-team" style="color:{a_color}; text-align:left;">{a_name}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        # กรณี API ขัดข้อง ดึงข้อมูลสำรองจากไฟล์ json มาโชว์เพื่อไม่ให้หน้าเว็บระเบิด
-        m = md["meta"]
-        st.markdown(
-            f'<div class="score-banner">'
-            f'  <div class="score-team" style="color:{m["home_color"]}; text-align:right;">{m["home_team"]}</div>'
-            f'  <div>'
-            f'    <div class="score-vs">{m["competition"]} — นัดที่ {m["matchweek"]}</div>'
-            f'    <div style="display:flex; align-items:center; justify-content:center;">'
-            f'      <span class="score-number">{m["home_score"]}</span>'
-            f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
-            f'      <span class="score-number">{m["away_score"]}</span>'
-            f'    </div>'
-            f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">🏟️ {m["venue"]} | 📅 {m["date"]}</div>'
-            f'  </div>'
-            f'  <div class="score-team" style="color:{m["away_color"]}; text-align:left;">{m["away_team"]}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+    # ── BANNER MATCHWEEK & SCORE ──
+    m = md["meta"]
+    st.markdown(
+        f'<div class="score-banner">'
+        f'  <div class="score-team" style="color:{m["home_color"]}; text-align:right;">{m["home_team"]}</div>'
+        f'  <div>'
+        f'    <div class="score-vs">{m["competition"]} — นัดที่ {m["matchweek"]}</div>'
+        f'    <div style="display:flex; align-items:center;">'
+        f'      <span class="score-number">{m["home_score"]}</span>'
+        f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
+        f'      <span class="score-number">{m["away_score"]}</span>'
+        f'    </div>'
+        f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">🏟️ {m["venue"]} | 📅 {m["date"]}</div>'
+        f'  </div>'
+        f'  <div class="score-team" style="color:{m["away_color"]}; text-align:left;">{m["away_team"]}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     # ── TAB MENU ──
     tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
@@ -620,26 +494,8 @@ with col_main:
 
     with tab_timeline:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
-        
-        # 💡 เช็กว่าแมตช์ที่เลือกใน Dropdown ด้านบน ตรงกับทีมที่เราเขียนคอนเทนต์ไว้ใน match_data.json หรือไม่
-        # (ตรวจสอบจากคำว่า Chelsea หรือชื่อทีมเยือน/เหย้าเพื่อให้แมตช์กัน)
-        # เปลี่ยนบรรทัด 627 เป็นแบบปลอดภัยนี้:
-# ดึงชื่อทีมจาก JSON เป็นค่าพื้นฐานเสมอ ป้องกัน NameError
-meta_home = md["meta"].get("home_team", "").lower()
-meta_away = md["meta"].get("away_team", "").lower()
-
-# ใช้ตัวแปร current_home_name/current_away_name ถ้ามีอยู่ (จาก logic ด้านบน) หรือใช้จาก JSON
-curr_h = locals().get("current_home_name", meta_home).lower()
-curr_a = locals().get("current_away_name", meta_away).lower()
-
-is_json_match = (meta_away in curr_a) or (meta_home in curr_h)
-        
-        if m_status != "FINISHED":
-            # กรณีเลือกแมตช์ที่ยังไม่ได้แข่งขัน
-            st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะอัปเดตเหตุการณ์สำคัญ (ประตู, ใบเหลือง-แดง, เปลี่ยนตัว) ทันทีหลังจบเกมครับ")
-        elif is_json_match and md.get("timeline"):
-            # กรณีเลือกแมตช์ที่แข่งขันจบแล้ว และตรงกับแมตช์ที่เราวิเคราะห์ไว้ใน JSON (นัด Chelsea)
+        st.markdown('<div class="card-title">ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        if md["timeline"]:
             for item in md["timeline"]:
                 st.markdown(
                     f'<div class="timeline-item">'
@@ -652,9 +508,7 @@ is_json_match = (meta_away in curr_a) or (meta_home in curr_h)
                     unsafe_allow_html=True,
                 )
         else:
-            # กรณีเลือกแมตช์อื่น ๆ ที่แข่งจบแล้ว แต่เรายังไม่ได้เขียนเหตุการณ์ลงในไฟล์ JSON
-            st.warning("📊 แมตช์นี้แข่งจบแล้ว แต่อยู่ระหว่างรอแอดมินอัปเดตข้อมูลเหตุการณ์เชิงลึก (ประตู/เปลี่ยนตัว) ลงในระบบหลังบ้านครับ")
-            
+            st.info("ไม่มีข้อมูลไทม์ไลน์ในแมตช์นี้")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab_analysis:
@@ -891,37 +745,22 @@ with col_side:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title">👀 ซูมฟอร์มคู่แข่งทีมสำคัญ</div>', unsafe_allow_html=True)
     if md.get("rival_compare"):
-        for rival in md["rival_compare"]:
-            # 💡 เพิ่มระบบดักจับประเภทข้อมูล (ป้องกัน AttributeError ถาวร)
-            if isinstance(rival, dict):
-                # กรณีที่ก้อนข้อมูลมาเป็นดิกชันนารีมีคีย์ซ้อน
-                rival_name = rival.get("team", "Unknown Team")
-                rival_pts  = rival.get("points", "-")
-                rival_play = rival.get("played", "-")
-                rival_last = rival.get("last_match", "-")
-                rival_comm = rival.get("status_comment", "")
-            else:
-                # กรณีที่ข้อมูลใน json ดั้งเดิมหลุดมาเป็น String ข้อความตรงๆ หรือแบบอื่น
-                rival_name = str(rival)
-                rival_pts  = "-"
-                rival_play = "-"
-                rival_last = "-"
-                rival_comm = ""
-
+        for r in md["rival_compare"]:
             st.markdown(
                 f'<div style="margin-bottom:0.75rem; font-size:0.9rem; padding-bottom:0.5rem; border-bottom:1px solid #1e293b;">'
                 f'  <div style="display:flex; justify-content:space-between; font-weight:600; color:#e2e8f0;">'
-                f'    <span>{rival_name}</span>'
-                f'    <span style="color:#eab308;">{rival_pts} แต้ม (นัดที่ {rival_play})</span>'
+                f'    <span>{r["team"]}</span>'
+                f'    <span style="color:#eab308;">{r["points"]} แต้ม (นัดที่ {r["played"]})</span>'
                 f'  </div>'
-                f'  <div style="font-size:0.8rem; color:#64748b; margin-top:0.15rem;">📌 นัดล่าสุด: {rival_last}</div>'
-                f'  <div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">{rival_comm}</div>'
+                f'  <div style="font-size:0.8rem; color:#64748b; margin-top:0.15rem;">📌 นัดล่าสุด: {r["last_match"]}</div>'
+                f'  <div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">{r["status_comment"]}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
     else:
         st.info("ไม่มีข้อมูลฟอร์มทีมคู่แข่ง")
     st.markdown('</div>', unsafe_allow_html=True)
+
     # ── POLLING ENGINE & COMMENTS — Phase 3 ──
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown(f'<div class="card-title">🗳️ โพลล์แฟนบอล: {POLL_QUESTION}</div>', unsafe_allow_html=True)
