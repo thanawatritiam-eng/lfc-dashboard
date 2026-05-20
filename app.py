@@ -10,7 +10,22 @@ import streamlit as st
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from google.oauth2 import service_account
-from googleapiclient.discovery import build
+from googleapiclient.discovery import buildimport google.generativeai as genai # 1. อย่าลืมเพิ่ม Import นี้ที่ด้านบนด้วยนะครับ
+
+# 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
+def get_match_timeline_from_gemini(home_team, away_team, date):
+    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
+    model = genai.GenerativeModel('gemini-1.0-flash')
+    
+    prompt = f"""
+    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
+    ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
+    ตอบเป็น JSON ตามโครงสร้างนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    """
+    
+    response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+    return json.loads(response.text)
+# ... (ฟังก์ชันอื่นๆ ตามเดิม)
 
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
@@ -965,6 +980,18 @@ with col_side:
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+
+if st.button("🤖 วิเคราะห์แมตช์ด้วย Gemini & บันทึกเข้า Sheet2"):
+    with st.spinner("Gemini กำลังอ่านข้อมูล..."):
+        # 1. ดึงข้อมูลจาก AI
+        timeline_data = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
+        
+        if timeline_data:
+            # 2. บันทึกลง Sheet2
+            save_timeline_to_sheet2(f"{current_home_name} vs {current_away_name}", timeline_data)
+            st.success("✨ วิเคราะห์สำเร็จและบันทึกลง Sheet2 เรียบร้อยแล้ว!")
+        else:
+            st.error("ไม่สามารถดึงข้อมูลได้")
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
