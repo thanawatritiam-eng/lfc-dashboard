@@ -11,27 +11,6 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import google.generativeai as genai # 1. อย่าลืมเพิ่ม Import นี้ที่ด้านบนด้วยนะครับ
-
-
-
-# เพิ่มฟังก์ชันนี้ในไฟล์ app.py
-def get_match_timeline_from_gemini(home_team, away_team, date):
-    # ปรับชื่อโมเดลเป็น gemini-1.0-pro เพื่อความเสถียร (ถ้า 1.5 ยังติด 404)
-    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
-    model = genai.GenerativeModel('gemini-1.0-pro') 
-    
-    prompt = f"""
-    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} 
-    ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
-    ขอในรูปแบบ JSON เท่านั้น ดังนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
-    ห้ามมีข้อความอื่นนอกจาก JSON
-    """
-    
-    response = model.generate_content(prompt)
-    # ล้างข้อความที่ติดมากับ JSON
-    clean_text = response.text.replace("```json", "").replace("```", "")
-    return json.loads(clean_text)
 
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
@@ -985,62 +964,7 @@ with col_side:
         st.markdown('<div class="comment-item" style="color:#94a3b8;text-align:center;">ยังไม่มีคอมเมนต์ เป็นคนแรกได้เลย! 👆</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-# 2. ในส่วนของ Main Layout หลังจาก st.selectbox เลือกแมตช์เสร็จแล้ว
-    # ── TAB MENU (ประกาศตรงนี้) ──
-    tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
-        "⏱️ ไทม์ไลน์สำคัญ", "🧐 วิเคราะห์แทคติก", "📊 สถิติทีม & นักเตะ", "🏆 ตารางคะแนน พรีเมียร์ลีก"
-    ])
 
-    # 3. นำโค้ด with tab_timeline มาวางไว้ใต้ st.tabs
-    with tab_timeline:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
-    
-    # ปุ่มสั่งงาน AI โดยใช้ค่าตัวแปรจาก Dropdown ปัจจุบัน
-    if st.button(f"🤖 วิเคราะห์ {current_home_name} vs {current_away_name} ด้วย AI"):
-        with st.spinner("Gemini กำลังวิเคราะห์ข้อมูลแมตช์นี้..."):
-            try:
-                # 1. ส่งค่าจากหน้าแรกไปให้ AI
-                ai_data = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
-                
-                # 2. นำไปบันทึกลง Sheet2
-                save_timeline_to_sheet2(f"{current_home_name} vs {current_away_name}", ai_data)
-                
-                st.success("✨ วิเคราะห์และบันทึกข้อมูลเรียบร้อย!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"เกิดข้อผิดพลาด: {e}")
-    
-    # 3. แสดงผลโดยดึงจาก Sheet2 (ฟังก์ชันโหลดของคุณ)
-    # สมมติคุณมีฟังก์ชัน fetch_timeline_from_sheet2() อยู่แล้ว
-    timeline_data = fetch_timeline_from_sheet2(f"{current_home_name} vs {current_away_name}")
-    
-    for item in timeline_data:
-        st.markdown(
-            f'<div class="timeline-item">'
-            f'  <div class="tl-time">{item["minute"]}</div>'
-            f'  <div class="tl-content"><b>{item["title"]}</b><div class="comment-text">{item["detail"]}</div></div>'
-            f'</div>', unsafe_allow_html=True
-        )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-# 1. กำหนดค่าเริ่มต้นเพื่อให้ตัวแปรมีตัวตนตั้งแต่บรรทัดแรกที่รัน
-# เราจะดึงมาจาก md หรือค่าว่าง เพื่อกัน NameError
-if 'current_home_name' not in globals():
-    current_home_name = md["meta"].get("home_team", "Liverpool")
-if 'current_away_name' not in globals():
-    current_away_name = md["meta"].get("away_team", "Unknown")
-if 'current_m_date' not in globals():
-    current_m_date = md["meta"].get("date", "2024-01-01")
-
-# 2. กรณีถ้ามีการเลือก Dropdown (ถ้ามีฟังก์ชันดึงจาก API) 
-# ให้ตรวจสอบว่า selected_option มีค่าไหม ถ้าไม่มีก็ให้ใช้ค่าจาก md เดิม
-if 'selected_option' in locals() and selected_option:
-    _, current_match_obj, _ = selected_option
-    current_home_name = current_match_obj["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
-    current_away_name = current_match_obj["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
-    current_m_date = current_match_obj.get("utcDate", "").split("T")[0]
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
