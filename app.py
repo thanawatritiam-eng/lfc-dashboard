@@ -1023,6 +1023,28 @@ with col_side:
             f'</div>', unsafe_allow_html=True
         )
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════
+# ป้องกัน NameError: ประกาศค่าเริ่มต้นไว้ก่อน
+# ══════════════════════════════════════════════════
+if 'current_home_name' not in locals():
+    current_home_name = "Liverpool"
+if 'current_away_name' not in locals():
+    current_away_name = "Unknown"
+if 'current_m_date' not in locals():
+    current_m_date = datetime.date.today().strftime("%Y-%m-%d")
+
+# ══════════════════════════════════════════════════
+# TAB MENU
+# ══════════════════════════════════════════════════
+tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
+    "⏱️ ไทม์ไลน์สำคัญ", "🧐 วิเคราะห์แทคติก", "📊 สถิติทีม & นักเตะ", "🏆 ตารางคะแนน พรีเมียร์ลีก"
+])
+
+with tab_timeline:
+    # ตอนนี้บรรทัดนี้จะไม่มี Error แล้ว เพราะตัวแปรมีค่าแน่นอนครับ
+    if st.button(f"🤖 วิเคราะห์ {current_home_name} vs {current_away_name} ด้วย AI"):
+        # ... โค้ด AI ของคุณ ...
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
