@@ -9,9 +9,11 @@ import json, random, pathlib, datetime, requests, time
 import streamlit as st
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
-from google.oauth2 import service_account
+import service_account
+import build
+import google.generativeai as genai # 1. อย่าลืมเพิ่ม Import นี้ที่ด้านบนด้วยนะครับ
+from google.oauth2 
 from googleapiclient.discovery 
-import buildimport google.generativeai as genai # 1. อย่าลืมเพิ่ม Import นี้ที่ด้านบนด้วยนะครับ
 
 # 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
 def get_match_timeline_from_gemini(home_team, away_team, date):
