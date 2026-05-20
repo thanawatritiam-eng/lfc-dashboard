@@ -746,13 +746,22 @@ with col_side:
     st.markdown('<div class="card-title">👀 ซูมฟอร์มคู่แข่งทีมสำคัญ</div>', unsafe_allow_html=True)
     if md.get("rival_compare"):
         for rival in md["rival_compare"]:
-            # แกะชื่อทีมออกมาตรงๆ ตามโครงสร้างใน match_data.json
-            rival_name = rival.get("team", "Unknown Team")
-            rival_pts  = rival.get("points", 0)
-            rival_play = rival.get("played", 0)
-            rival_last = rival.get("last_match", "-")
-            rival_comm = rival.get("status_comment", "")
-            
+            # 💡 เพิ่มระบบดักจับประเภทข้อมูล (ป้องกัน AttributeError ถาวร)
+            if isinstance(rival, dict):
+                # กรณีที่ก้อนข้อมูลมาเป็นดิกชันนารีมีคีย์ซ้อน
+                rival_name = rival.get("team", "Unknown Team")
+                rival_pts  = rival.get("points", "-")
+                rival_play = rival.get("played", "-")
+                rival_last = rival.get("last_match", "-")
+                rival_comm = rival.get("status_comment", "")
+            else:
+                # กรณีที่ข้อมูลใน json ดั้งเดิมหลุดมาเป็น String ข้อความตรงๆ หรือแบบอื่น
+                rival_name = str(rival)
+                rival_pts  = "-"
+                rival_play = "-"
+                rival_last = "-"
+                rival_comm = ""
+
             st.markdown(
                 f'<div style="margin-bottom:0.75rem; font-size:0.9rem; padding-bottom:0.5rem; border-bottom:1px solid #1e293b;">'
                 f'  <div style="display:flex; justify-content:space-between; font-weight:600; color:#e2e8f0;">'
