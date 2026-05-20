@@ -15,23 +15,21 @@ import google.generativeai as genai # 1. อย่าลืมเพิ่ม Im
 
 
 
+# เพิ่มฟังก์ชันนี้ในไฟล์ app.py
 def get_match_timeline_from_gemini(home_team, away_team, date):
+    # ปรับชื่อโมเดลเป็น gemini-1.0-pro เพื่อความเสถียร (ถ้า 1.5 ยังติด 404)
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
-    
-    # เปลี่ยนชื่อโมเดลเป็นตัวนี้ครับ
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    model = genai.GenerativeModel('gemini-1.0-pro') 
     
     prompt = f"""
-    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
+    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} 
     ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
-    ตอบเป็น JSON ตามโครงสร้างนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    ขอในรูปแบบ JSON เท่านั้น ดังนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    ห้ามมีข้อความอื่นนอกจาก JSON
     """
     
-    # ลองเอา response_mime_type ออกก่อนถ้ายังติด error 404
-    # เพราะบาง API Version อาจจะยังไม่ support โหมด JSON อัตโนมัติ
     response = model.generate_content(prompt)
-    
-    # ถ้าเอา response_mime_type ออก ต้องทำการล้างข้อความเองแบบนี้
+    # ล้างข้อความที่ติดมากับ JSON
     clean_text = response.text.replace("```json", "").replace("```", "")
     return json.loads(clean_text)
 
