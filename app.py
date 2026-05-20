@@ -29,7 +29,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
     
     # 1. เปลี่ยนมาใช้โมเดล gemini-1.0-pro ซึ่งรองรับในทุกบัญชีและเสถียรมาก
-   def get_match_timeline_from_gemini(home_team, away_team, date):
+def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
     model = genai.GenerativeModel('gemini-1.5-flash')
     
