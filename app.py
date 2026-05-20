@@ -40,15 +40,14 @@ COMPETITIONS = {
 
 # ══════════════════════════════════════════════════
 # API-FOOTBALL LAYER  ← Phase 4 (RapidAPI Edition)
-# ══════════════════════════════════════════════════
-def _api_headers() -> dict:
+# ══════════════════════════════════════════════════def _api_headers() -> dict:
     return {
-        "X-Auth-Token":  st.secrets["football_data.token"]["key"],
-        "x-rapidapi-host": "api.football-data.org/v4",
+        "X-Auth-Token": st.secrets["football_data"]["token"],
+        "Content-Type": "application/json"
     }
 
-def _get(endpoint: str, params: dict) -> dict | None:
-    """raw GET — จัดการ error ให้ครบ"""
+def _get(endpoint: str, params: dict = None) -> dict | None:
+    """raw GET — จัดการ error ให้ครบตามกฎ Football-Data.org"""
     try:
         r = requests.get(
             f"https://api.football-data.org/v4/{endpoint}",
@@ -56,6 +55,12 @@ def _get(endpoint: str, params: dict) -> dict | None:
             params=params,
             timeout=10,
         )
+        
+        # ดักจับกรณีเรียกข้อมูลถี่เกินไป (Rate Limit 10 ครั้ง/นาที ของค่ายนี้)
+        if r.status_code == 429:
+            st.error("⚠️ เรียกข้อมูลถี่เกินไป (Rate Limit) กรุณารอ 1 นาทีแล้วลองกดใหม่อีกครั้งครับ")
+            return None
+            
         if r.status_code == 200:
             data = r.json()
             if data.get("errors"):
