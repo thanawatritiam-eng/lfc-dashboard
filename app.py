@@ -1024,15 +1024,7 @@ with col_side:
         )
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════
-# ป้องกัน NameError: ประกาศค่าเริ่มต้นไว้ก่อน
-# ══════════════════════════════════════════════════
-if 'current_home_name' not in locals():
-    current_home_name = "Liverpool"
-if 'current_away_name' not in locals():
-    current_away_name = "Unknown"
-if 'current_m_date' not in locals():
-    current_m_date = datetime.date.today().strftime("%Y-%m-%d")
+
 # 1. กำหนดค่าเริ่มต้นเพื่อให้ตัวแปรมีตัวตนตั้งแต่บรรทัดแรกที่รัน
 # เราจะดึงมาจาก md หรือค่าว่าง เพื่อกัน NameError
 if 'current_home_name' not in globals():
