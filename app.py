@@ -1022,7 +1022,7 @@ with col_side:
             f'  <div class="tl-content"><b>{item["title"]}</b><div class="comment-text">{item["detail"]}</div></div>'
             f'</div>', unsafe_allow_html=True
         )
-    st.markdown('</div>', unsafe_allow_html=True))
+    st.markdown('</div>', unsafe_allow_html=True)
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
