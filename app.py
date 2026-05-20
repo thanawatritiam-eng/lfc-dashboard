@@ -17,6 +17,13 @@ from googleapiclient.discovery import build
 # เพิ่ม Library นี้แยกออกมา
 import google.generativeai as genai
 
+# ในฟังก์ชัน get_match_timeline_from_gemini
+import google.generativeai as genai
+from google.generativeai.types import RequestOptions
+
+# บังคับให้ใช้ API เวอร์ชัน v1 แทน v1beta
+genai.configure(api_key=st.secrets["gemini_api_key"]["token"], transport='rest')
+
 # 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
 def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
