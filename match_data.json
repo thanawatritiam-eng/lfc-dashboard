@@ -1,24 +1,4 @@
-def auto_update_match_json(home_team: str, away_team: str, match_date: str):
-    """ฟังก์ชันอัปเดตไฟล์หลังบ้านอัตโนมัติ"""
-    # โหลดไฟล์เดิมขึ้นมาดูก่อน
-    current_data = load_match_data()
-    
-    # สั่ง Gemini เจนโครงสร้างไทม์ไลน์ใหม่ให้
-    ai_result = generate_match_timeline_via_gemini(home_team, away_team, match_date)
-    
-    if ai_result and "timeline" in ai_result:
-        # อัปเดตข้อมูล Meta และสลับเอาไทม์ไลน์ของ Gemini ใส่เข้าไปแทนที่
-        current_data["meta"]["home_team"] = home_team
-        current_data["meta"]["away_team"] = away_team
-        current_data["meta"]["date"] = match_date
-        current_data["timeline"] = ai_result["timeline"]
-        
-        # เขียนบันทึกทับลงไปในไฟล์ match_data.json บนเซิร์ฟเวอร์
-        with open("match_data.json", "w", encoding="utf-8") as f:
-            json.dump(current_data, f, ensure_allow_unicode=False, indent=2)
-            
-        st.success("✨ Gemini ได้ทำการดึงข้อมูลและบันทึกไทม์ไลน์นัดนี้เข้าสู่ระบบเรียบร้อยแล้ว!")
-        st.rerun()
+
 {
   "_readme": "แก้ข้อมูลแมตช์ได้ที่นี่โดยไม่ต้องแตะ app.py เลย",
 
