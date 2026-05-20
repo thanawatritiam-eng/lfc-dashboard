@@ -3,7 +3,7 @@
 ✅ Phase 1: UI/UX Streamlit Cloud
 ✅ Phase 2: JSON Data, Charts, Mobile
 ✅ Phase 3: Google Sheets Comments
-✅ Phase 4: API-Football Real-time (ผล + ตาราง + สถิตินักเตะ)
+✅ Phase 4: API-Football Real-time (ผล + ตาราง + สถิตินักเตะ) -> ย้ายสู่ Football-Data.org สมบูรณ์แบบ
 """
 import json, random, pathlib, datetime, requests, time
 import streamlit as st
@@ -23,21 +23,26 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════════
-# CONSTANTS
+# CONSTANTS (ปรับปรุงสำหรับ Football-Data.org)
 # ══════════════════════════════════════════════════
-LIVERPOOL_ID  = 64
-SEASON        = 2024          # ปรับได้ใน match_data.json
+LIVERPOOL_ID  = 64            # ไอดีของลิเวอร์พูลในค่ายใหม่
+SEASON        = 2024          # ปีฤดูกาลปัจจุบัน
 CACHE_TTL_SEC = 3600          # 1 ชั่วโมง (ประหยัด quota)
 LIVE_TTL_SEC  = 300           # 5 นาที (วันแข่ง)
 
-# competition Codes ที่ค่ายใหม่รองรับ (ใช้ตัวย่อภาษาอังกฤษแทนตัวเลขครับ)
+# รหัสการแข่งขันย่อ (Competition Codes) ตามมาตรฐานของค่ายใหม่
 COMPETITIONS = {
-    "PL": "Premier League",    # 👈 พรีเมียร์ลีกใช้ "PL"
-    "CL": "Champions League"   # 👈 แชมเปียนส์ลีกใช้ "CL"
+    "PL": "Premier League",
+    "CL": "Champions League"
 }
 
+# ข้อความและคำถามสำหรับการโหวต
+POLL_QUESTION = "คุณคิดว่า อาร์เนอ สล็อต ดื้อเกินไปไหมในเกมนี้?"
+AGREE_TEXT    = "ดื้อจริง! เปลี่ยนตัวแปลกๆ ทำทีมเสียสมดุล"
+DISAGREE_TEXT = "ให้โอกาสไปก่อน ระบบยังใหม่ ต้องปรับจูนกันอีก"
+
 # ══════════════════════════════════════════════════
-# API-FOOTBALL LAYER  ← Phase 4 (RapidAPI Edition)
+# API CORE — Phase 4 (Football-Data.org)
 # ══════════════════════════════════════════════════
 def _api_headers() -> dict:
     return {
@@ -97,8 +102,9 @@ def _cached(name: str, ttl: int, fetch_fn):
 def fmt_date(iso_str: str) -> str:
     """แปลงเวลาสากล ISO เป็นวันเวลาไทยอ่านง่าย"""
     try:
+        if " " in iso_str:
+            return iso_str
         dt = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
-        # ปรับเพิ่มเวลาเข้าสู่โซนเวลาไทย (+7 ชั่วโมง)
         dt_th = dt.astimezone(datetime.timezone(datetime.timedelta(hours=7)))
         return dt_th.strftime("%d/%m/%Y %H:%M น.")
     except:
@@ -115,9 +121,7 @@ def result_badge(home_goals: int, away_goals: int, home_id: int) -> tuple[str, s
     else:
         return ("L", "#C8102E") if is_lfc_home else ("W", "#16a34a")
 
-# ── Optimized Fetch Functions (ลดการยิง API ป้องกัน HTTP 429) ──
-
-# ── ฟังก์ชันดึงข้อมูลการแข่งขัน (เวอร์ชันสมบูรณ์แบบแก้ปัญหา KeyError ถาวรสำหรับ Football-Data.org) ──
+# ── ฟังก์ชันดึงข้อมูลการแข่งขัน (เวอร์ชันแก้ปัญหา KeyError ถาวรสำหรับ Football-Data.org) ──
 def fetch_all_fixtures_data() -> list:
     """ดึงข้อมูลแมตช์ทั้งหมดของ Liverpool จาก Football-Data.org"""
     def _fetch():
@@ -137,7 +141,6 @@ def fetch_last_fixtures(n: int = 5) -> list:
     
     formatted = []
     for f in past_fixtures[:n]:
-        # ค้นหาข้อมูลลีกที่ติดมากับข้อมูลแมตช์ย้อนหลัง
         comp_name = f.get("competition", {}).get("name", "Premier League")
         comp_code = f.get("competition", {}).get("code", "PL")
         
@@ -155,7 +158,6 @@ def fetch_last_fixtures(n: int = 5) -> list:
                 "home": f["score"]["fullTime"]["home"], 
                 "away": f["score"]["fullTime"]["away"]
             },
-            # 💡 ใส่บล็อก league หลอกไว้ตรงนี้ เพื่อแก้ปัญหา KeyError บรรทัด 648 ถาวร!
             "league": {
                 "id": comp_code,
                 "name": comp_name
@@ -185,7 +187,6 @@ def fetch_next_fixture() -> dict | None:
                 "home": {"name": nxt["homeTeam"]["name"]},
                 "away": {"name": nxt["awayTeam"]["name"]}
             },
-            # 💡 ใส่บล็อก league หลอกไว้สำหรับแมตช์ถัดไป (บรรทัด 610)
             "league": {
                 "id": comp_code,
                 "name": comp_name
@@ -216,7 +217,6 @@ def fetch_live_fixture() -> dict | None:
                 "home": lm["score"]["fullTime"]["home"], 
                 "away": lm["score"]["fullTime"]["away"]
             },
-            # 💡 ใส่บล็อก league หลอกไว้สำหรับหน้าแมตช์สด ป้องกันอาการระเบิดซ้ำซ้อน
             "league": {
                 "id": comp_code,
                 "name": comp_name
@@ -224,14 +224,28 @@ def fetch_live_fixture() -> dict | None:
         }
     return None
 
-# ── ฟังก์ชันดึงตารางคะแนน ──
 def fetch_standings() -> dict:
-    """ดึงตารางคะแนนพรีเมียร์ลีกจาก Football-Data.org (ปรับคีย์ให้ครบจบปัญหา KeyError ตารางคะแนน)"""
+    """ดึงตารางคะแนนพรีเมียร์ลีกและตรวจสอบเงื่อนไขแชมป์ทางคณิตศาสตร์จาก Football-Data.org"""
     def _fetch():
         out = {}
         data = _get("competitions/PL/standings")
         if data and data.get("standings"):
             raw_table = data["standings"][0]["table"]
+            
+            # ⚽ ตรวจสอบเงื่อนไขแต้มขาดลอยเพื่อฉลองแชมป์
+            is_champion_decided = False
+            champion_team_name = ""
+            if len(raw_table) >= 2:
+                p1 = raw_table[0]  # ทีมอันดับ 1
+                p2 = raw_table[1]  # ทีมอันดับ 2
+                
+                remaining_games_p2 = 38 - p2["playedGames"]
+                max_possible_points_p2 = p2["points"] + (remaining_games_p2 * 3)
+                
+                # หากแต้มของอันดับ 1 มากกว่าแต้มสูงสุดเท่าที่อันดับ 2 จะทำได้ = แต้มขาด คว้าแชมป์ชัวร์!
+                if p1["points"] > max_possible_points_p2:
+                    is_champion_decided = True
+                    champion_team_name = p1["team"]["name"]
             
             formatted_table = []
             for item in raw_table:
@@ -240,11 +254,12 @@ def fetch_standings() -> dict:
                     "team": {
                         "name": item["team"]["name"], 
                         "id": item["team"]["id"], 
-                        "logo": item["team"].get("crest", "")  # ใส่รูปโลโก้ของค่ายใหม่แถมไปด้วยครับ
+                        "logo": item["team"].get("crest", "")
                     },
                     "points": item["points"],
-                    # 💡 ใส่เพิ่มตรงนี้! แก้ปัญหา KeyError: goalsDiff ที่บรรทัด 755 ถาวร
-                    "goalsDiff": item["goalDifference"],  
+                    "goalsDiff": item["goalDifference"],  # แก้ปัญหา KeyError: goalsDiff ประตูได้เสีย
+                    "is_champion_decided": is_champion_decided,
+                    "champion_name": champion_team_name,
                     "all": {
                         "played": item["playedGames"],
                         "win": item["won"],
@@ -260,10 +275,35 @@ def fetch_standings() -> dict:
         return out
     return _cached("standings", CACHE_TTL_SEC, _fetch) or {}
 
-# ── ฟังก์ชันสถิตินักเตะ ──
 def fetch_player_stats(league_id: str = "PL") -> list:
-    """ส่งกลับค่าว่างสำหรับสถิตินักเตะ เพื่อไม่ให้ UI พังเพราะติดข้อจำกัดสิทธิ์ของค่ายใหม่"""
-    return []
+    """สลับมาดึงอันดับดาวซัลโวรวมของลีกล่าสุด (Top Scorers) เพื่อให้หน้าเว็บไม่โล่งและไม่ติดข้อจำกัดสิทธิ์ค่ายฟรี"""
+    def _fetch():
+        data = _get("competitions/PL/scorers")
+        if data and data.get("scorers"):
+            raw_scorers = data["scorers"]
+            
+            formatted_players = []
+            for item in raw_scorers[:8]:  # ดึงมาโชว์ 8 อันดับแรก
+                player = item["player"]
+                team = item["team"]
+                
+                formatted_players.append({
+                    "player": {
+                        "name": player.get("name", "Unknown"),
+                        "photo": ""
+                    },
+                    "statistics": [{
+                        "team": {"name": team.get("name", "LFC")},
+                        "goals": {
+                            "total": item.get("goals", 0),
+                            "assists": item.get("assists", 0)
+                        }
+                    }]
+                })
+            return formatted_players
+        return []
+    return _cached("players_top_scorers", CACHE_TTL_SEC, _fetch) or []
+
 # ══════════════════════════════════════════════════
 # GOOGLE SHEETS — Phase 3
 # ══════════════════════════════════════════════════
@@ -279,31 +319,9 @@ def get_sheets_service():
 def get_sheet_id() -> str:
     return st.secrets["gsheets"]["spreadsheet_id"]
 
-def fetch_comments() -> list:
-    try:
-        res  = get_sheets_service().values().get(
-            spreadsheetId=get_sheet_id(),
-            range=f"{SHEET_TAB}!A2:D",
-        ).execute()
-        rows = res.get("values", [])
-        out  = []
-        for r in reversed(rows):
-            if len(r) >= 3:
-                out.append({
-                    "timestamp":  r[0] if len(r) > 0 else "",
-                    "user":       r[1] if len(r) > 1 else "Fan",
-                    "text":       r[2] if len(r) > 2 else "",
-                    "user_color": "#1e293b",
-                    "border":     (r[3].lower() == "true") if len(r) > 3 else False,
-                })
-        return out
-    except Exception as e:
-        st.warning(f"⚠️ โหลดคอมเมนต์ไม่ได้: {e}")
-        return []
-
 def push_comment(user: str, text: str, border: bool = False) -> bool:
     try:
-        # 💡 สร้างโซนเวลาประเทศไทย (UTC + 7 ชั่วโมง) และดึงเวลาปัจจุบันให้ตรงเป๊ะ
+        # 💡 บังคับสร้างโซนเวลาประเทศไทย (UTC + 7) ให้หมดปัญหาเวลาบันทึกเบี้ยวเป็นเวลาเมืองนอก
         tz_th = datetime.timezone(datetime.timedelta(hours=7))
         ts = datetime.datetime.now(tz_th).strftime("%Y-%m-%d %H:%M:%S")
         
@@ -319,762 +337,521 @@ def push_comment(user: str, text: str, border: bool = False) -> bool:
         st.error(f"❌ บันทึกไม่สำเร็จ: {e}")
         return False
 
-# ══════════════════════════════════════════════════
-# LOAD MATCH DATA JSON — Phase 2
-# ══════════════════════════════════════════════════
-@st.cache_data
-def load_match():
-    p = pathlib.Path(__file__).parent / "match_data.json"
-    with open(p, encoding="utf-8") as f:
-        return json.load(f)
-
-D      = load_match()
-META   = D["meta"]
-TL     = D["timeline"]
-QUOTES = D["quotes"]
-GRAV   = D["gravenberch"]
-ROM    = D["romano"]
-STATS  = D["stats"]
-SPOT   = D["spotlight"]
-ANA    = D["analysis"]
-RIV    = D["rival_compare"]
-
-AGREE_TEXT    = "เห็นด้วยกับพี่เจมส์ป๊อก สล็อตดื้อเกินไป ไม่ยอมรับผิด!"
-DISAGREE_TEXT = "ผมว่าใจเย็นๆ ขุมกำลังเราเจ็บเยอะ สล็อตทำได้เท่านี้ก็โอเคแล้ว"
-
-# ══════════════════════════════════════════════════
-# CSS
-# ══════════════════════════════════════════════════
-components.html("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap');
-</style>
-<script>
-const css = `
-  html,body,[class*="css"],.stMarkdown,.stMarkdown p,.stMarkdown div,.element-container
-    { font-family:'Noto Sans Thai',sans-serif !important; }
-  section[data-testid="stSidebar"] { display:none; }
-  #MainMenu,footer,header { visibility:hidden; }
-  .stApp { background:#f8fafc !important; }
-  .block-container { padding-top:1rem !important; padding-bottom:2rem !important; }
-
-  /* Header */
-  .lfc-header { background:#C8102E;padding:14px 24px;border-radius:12px;
-    display:flex;align-items:center;gap:12px;
-    box-shadow:0 4px 12px rgba(200,16,46,.35);margin-bottom:20px; }
-  .lfc-logo { width:44px;height:44px;background:#fff;border-radius:50%;
-    border:2px solid #F6EB61;display:flex;align-items:center;justify-content:center;
-    font-weight:900;font-size:16px;color:#C8102E;flex-shrink:0; }
-  .lfc-title { color:#fff;font-size:19px;font-weight:800;
-    text-transform:uppercase;letter-spacing:.06em;line-height:1.2; }
-  .lfc-sub { color:#F6EB61;font-size:10px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.12em; }
-  .badge { font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;
-    margin-left:6px;vertical-align:middle; }
-  .badge-green { background:linear-gradient(135deg,#16a34a,#15803d);color:#fff !important; }
-  .badge-orange { background:linear-gradient(135deg,#ea580c,#c2410c);color:#fff !important; }
-  .badge-live { background:#C8102E;color:#fff !important;animation:pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
-
-  /* Cards */
-  .card { background:#fff;border-radius:14px;padding:20px;
-    border:1px solid #e5e7eb;box-shadow:0 1px 5px rgba(0,0,0,.07);
-    margin-bottom:14px;color:#1e293b; }
-  .card-red-border  { border:1.5px solid #C8102E !important;background:#fef2f2 !important; }
-  .card-gold-border { border:2px solid #F6EB61 !important; }
-  .card-dark { background:#1e293b !important;border-color:#334155 !important; }
-
-  /* Live score banner */
-  .live-banner { background:linear-gradient(135deg,#C8102E,#991b1b);
-    border-radius:14px;padding:18px 24px;color:#fff;margin-bottom:16px;
-    display:flex;align-items:center;justify-content:space-between;
-    box-shadow:0 4px 12px rgba(200,16,46,.3); }
-  .live-dot { width:10px;height:10px;background:#4ade80;border-radius:50%;
-    display:inline-block;margin-right:6px;animation:pulse 1.5s infinite; }
-  .live-score { font-size:36px;font-weight:900;letter-spacing:.05em; }
-  .live-teams { font-size:13px;opacity:.85; }
-  .live-min   { font-size:28px;font-weight:800;color:#F6EB61; }
-
-  /* Fixture card */
-  .fix-card { background:#fff;border-radius:10px;padding:12px 16px;
-    border:1px solid #e5e7eb;margin-bottom:8px;
-    display:flex;align-items:center;justify-content:space-between; }
-  .fix-teams { font-weight:600;font-size:14px;color:#1e293b; }
-  .fix-score { font-weight:900;font-size:18px;color:#0f172a;text-align:center;min-width:50px; }
-  .fix-comp  { font-size:11px;color:#64748b; }
-  .fix-date  { font-size:11px;color:#94a3b8;text-align:right; }
-  .wdl-badge { font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;color:#fff; }
-
-  /* Standing table */
-  .stand-table { width:100%;border-collapse:collapse;font-size:13px; }
-  .stand-table th { color:#475569;font-weight:600;font-size:11px;
-    text-transform:uppercase;letter-spacing:.05em;
-    padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center; }
-  .stand-table td { padding:7px 8px;border-bottom:1px solid #f1f5f9;
-    color:#374151;text-align:center; }
-  .stand-table td:first-child { text-align:left;font-weight:600;color:#1e293b; }
-  .stand-table tr.highlight-lfc td { background:#fef2f2;font-weight:800;color:#b91c1c; }
-  .stand-table tr:hover td { background:#f8fafc; }
-
-  /* Player stats */
-  .player-row { display:flex;align-items:center;padding:10px 0;
-    border-bottom:1px solid #f1f5f9;gap:10px; }
-  .player-num  { width:22px;font-size:12px;font-weight:700;color:#94a3b8;text-align:center; }
-  .player-name { flex:1;font-weight:600;font-size:14px;color:#1e293b; }
-  .player-pos  { font-size:11px;color:#64748b;margin-left:4px; }
-  .player-stat { text-align:center;min-width:36px; }
-  .player-stat-val  { font-size:16px;font-weight:900;color:#C8102E; }
-  .player-stat-lbl  { font-size:10px;color:#94a3b8; }
-
-  /* Next match */
-  .next-match { background:linear-gradient(135deg,#1e293b,#0f172a);
-    border-radius:14px;padding:20px;color:#fff;margin-bottom:14px; }
-  .next-label  { color:#F6EB61;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px; }
-  .next-teams  { font-size:22px;font-weight:800;margin-bottom:6px; }
-  .next-detail { color:#94a3b8;font-size:13px; }
-
-  /* Scoreboard (manual match) */
-  .scoreboard { background:#f1f5f9;border-radius:12px;padding:16px;
-    display:flex;justify-content:space-around;align-items:center;
-    text-align:center;margin-bottom:18px; }
-  .score-team-liv { color:#b91c1c;font-weight:800;font-size:17px; }
-  .score-team-che { color:#1d4ed8;font-weight:800;font-size:17px; }
-  .score-num { color:#0f172a;font-weight:900;font-size:42px;line-height:1; }
-  .score-vs  { color:#64748b;font-weight:700;font-size:22px; }
-
-  /* Timeline */
-  .tl-row { display:flex;margin-bottom:12px; }
-  .tl-min { width:40px;flex-shrink:0;color:#475569;font-weight:700;font-size:12px;padding-top:3px; }
-  .tl-body { flex:1;padding-left:12px;border-left:3px solid #d1d5db;padding-bottom:12px; }
-  .tl-body.red  { border-color:#C8102E; }
-  .tl-body.blue { border-color:#1d4ed8; }
-  .tl-title-red  { color:#b91c1c;font-weight:900;font-size:16px; }
-  .tl-title-blue { color:#1d4ed8;font-weight:900;font-size:16px; }
-  .tl-title-gray { color:#1e293b;font-weight:700;font-size:14px; }
-  .tl-desc { color:#374151;font-size:13px;margin-top:3px;line-height:1.5; }
-
-  /* Quotes */
-  .quote-label { font-size:11px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.08em;margin-bottom:8px;display:block; }
-  .quote-text { font-size:15px;font-style:italic;color:#1e293b;margin-bottom:10px;line-height:1.6; }
-  .quote-bold { font-size:18px;font-weight:800;color:#0f172a;margin-bottom:10px; }
-  .quote-note { font-size:13px;color:#4b5563;line-height:1.5; }
-
-  .romano-box { background:#1e293b;border-radius:14px;padding:20px;
-    display:flex;align-items:flex-start;gap:12px;margin-top:12px; }
-  .romano-title { color:#F6EB61;font-weight:700;margin-bottom:4px;font-size:14px; }
-  .romano-text  { color:#cbd5e1;font-size:13px;line-height:1.6; }
-  .romano-text strong { color:#fff; }
-
-  .grav-card { background:#fff;border-radius:14px;padding:16px;
-    border:1px solid #e5e7eb;display:flex;gap:12px;align-items:flex-start;margin-top:10px; }
-  .grav-icon { font-size:30px;flex-shrink:0; }
-  .grav-label { color:#475569;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.08em; }
-  .grav-quote { color:#1e293b;font-weight:600;font-size:14px;margin:4px 0; }
-  .grav-desc  { color:#475569;font-size:13px;line-height:1.5; }
-
-  /* Headings */
-  .drama-heading { color:#0f172a;font-size:19px;font-weight:800;
-    border-left:4px solid #C8102E;padding-left:12px;margin-bottom:14px; }
-  .sec-heading { color:#0f172a;font-size:24px;font-weight:800;
-    text-transform:uppercase;text-align:center;margin-bottom:6px; }
-  .sec-sub { color:#475569;font-size:14px;text-align:center;
-    max-width:660px;margin:0 auto 22px;line-height:1.6; }
-  .subsec-heading { color:#0f172a;font-size:16px;font-weight:800;
-    border-bottom:2px solid #C8102E;padding-bottom:6px;
-    margin-bottom:14px;display:inline-block; }
-
-  /* Stat cards */
-  .stat-card-red  { background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px;text-align:center; }
-  .stat-card-blue { background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;text-align:center; }
-  .stat-card-gray { background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;margin-top:10px; }
-  .stat-num-red   { color:#b91c1c;font-size:36px;font-weight:900; }
-  .stat-num-blue  { color:#1d4ed8;font-size:36px;font-weight:900; }
-  .stat-num-gray  { color:#0f172a;font-size:26px;font-weight:900; }
-  .stat-label     { color:#374151;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:3px; }
-
-  /* Compare */
-  .compare-box { background:linear-gradient(135deg,#7f1d1d,#000);
-    border-radius:14px;padding:24px;margin-bottom:14px; }
-  .compare-title   { color:#F6EB61;font-weight:700;font-size:16px;margin-bottom:8px; }
-  .compare-body    { color:#e2e8f0;font-size:13px;margin-bottom:14px;line-height:1.5; }
-  .compare-row     { display:flex;justify-content:space-around;text-align:center;align-items:center; }
-  .compare-liv     { color:#fff;font-size:20px;font-weight:900; }
-  .compare-liv-sub { color:#fca5a5;font-size:11px; }
-  .compare-vs      { color:#e2e8f0;font-size:18px;font-weight:700; }
-  .compare-riv     { font-size:20px;font-weight:900; }
-  .compare-riv-sub { font-size:11px;color:#94a3b8; }
-
-  /* Comment */
-  .comment-box   { background:#f1f5f9;border:1px solid #e2e8f0;border-radius:14px;padding:16px; }
-  .comment-title { color:#0f172a;font-weight:700;margin-bottom:10px;font-size:14px; }
-  .comment-item  { background:#fff;border-radius:8px;padding:9px 13px;
-    margin-bottom:7px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:13px;color:#374151;line-height:1.5; }
-  .comment-item-red { border-left:3px solid #C8102E; }
-  .comment-ts { font-size:10px;color:#94a3b8;float:right;margin-top:2px; }
-  .sheets-badge { display:inline-flex;align-items:center;gap:5px;
-    background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;
-    padding:4px 10px;font-size:11px;font-weight:700;color:#2e7d32;margin-bottom:10px; }
-
-  /* Editor */
-  .editor-card  { background:#fff;border-radius:14px;padding:26px;
-    border-top:4px solid #C8102E;box-shadow:0 1px 5px rgba(0,0,0,.07); }
-  .editor-title { color:#0f172a;font-size:19px;font-weight:900;margin-bottom:10px; }
-  .editor-body  { color:#374151;line-height:1.8;margin-bottom:10px;font-size:14px; }
-  .editor-quote { color:#1e293b;font-weight:600;line-height:1.8;font-size:14px; }
-
-  /* Footer */
-  .lfc-footer { background:#111827;padding:20px;text-align:center;border-radius:14px;margin-top:32px; }
-  .footer-title { color:#fff;font-weight:700;font-size:15px;margin-bottom:4px; }
-  .footer-ref   { color:#9ca3af;font-size:12px;margin-bottom:3px; }
-  .footer-copy  { color:#6b7280;font-size:11px; }
-
-  @media (max-width:768px) {
-    .lfc-title { font-size:15px; }
-    .sec-heading { font-size:18px; }
-    .score-num { font-size:32px; }
-    .card { padding:14px; }
-    .live-score { font-size:26px; }
-  }
-`;
-const s = window.parent.document.createElement('style');
-s.textContent = css;
-window.parent.document.head.appendChild(s);
-</script>
-""", height=0, scrolling=False)
+def fetch_comments() -> list:
+    try:
+        res = get_sheets_service().values().get(
+            spreadsheetId=get_sheet_id(),
+            range=f"{SHEET_TAB}!A:D"
+        ).execute()
+        rows = res.get("values", [])
+        out = []
+        for r in rows:
+            if len(r) >= 3:
+                out.append({
+                    "ts": r[0],
+                    "user": r[1],
+                    "text": r[2],
+                    "border": r[3] if len(r) > 3 else "False"
+                })
+        out.reverse()  # ล่าสุดอยู่บน
+        return out
+    except Exception as e:
+        st.warning(f"⚠️ โหลดคอมเมนต์ไม่สำเร็จ: {e}")
+        return []
 
 # ══════════════════════════════════════════════════
-# SESSION STATE
+# LOCAL DATA ENGINE — Phase 2
 # ══════════════════════════════════════════════════
-if "tab" not in st.session_state:
-    st.session_state.tab = "live"    # Phase 4 default tab = Live
-if "comments" not in st.session_state:
-    st.session_state.comments = fetch_comments()
+def load_match_data() -> dict:
+    p = pathlib.Path("match_data.json")
+    if p.exists():
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {
+        "meta": {
+            "home_team": "Liverpool", "away_team": "Chelsea",
+            "home_score": 0, "away_score": 0,
+            "date": "2024-10-20", "venue": "Anfield",
+            "competition": "Premier League", "matchweek": 8,
+            "home_color": "#C8102E", "away_color": "#034694"
+        },
+        "timeline": [],
+        "stats": {"home": {}, "away": {}},
+        "spotlight": {"name": "", "age": 0, "stats": [], "note": ""},
+        "analysis": {"title": "", "body": "", "quote": ""},
+        "rival_compare": []
+    }
 
-# ── helpers ──
-def render_comment(c: dict) -> str:
-    color  = c.get("user_color", "#1e293b")
-    user   = c.get("user", "Fan")
-    text   = c.get("text", "")
-    ts     = c.get("timestamp", "")[:10]
-    border = "comment-item-red" if c.get("border") else ""
-    ts_html = f'<span class="comment-ts">{ts}</span>' if ts else ""
-    return (f'<div class="comment-item {border}">'
-            f'<span style="color:{color};font-weight:700;">{user}:</span> {text}'
-            f'{ts_html}</div>')
-
-def tl_cls(t: str):
-    return {"goal_liv": ("tl-title-red","red"),
-            "goal_che": ("tl-title-blue","blue")}.get(t, ("tl-title-gray",""))
+md = load_match_data()
 
 # ══════════════════════════════════════════════════
-# HEADER
+# INJECT CUSTOM CSS — Phase 1
 # ══════════════════════════════════════════════════
-live_fix = fetch_live_fixture()
-live_label = (
-    '<span class="badge badge-live">🔴 LIVE</span>'
-    if live_fix else
-    '<span class="badge badge-green">Phase 4 🔗 API</span>'
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+    html, body, [data-testid="stAppViewContainer"] {
+        font-family: 'Sarabun', sans-serif;
+        background-color: #0f172a;
+        color: #f1f5f9;
+    }
+    .lfc-header {
+        background: linear-gradient(135deg, #C8102E 0%, #8A081D 100%);
+        padding: 2.5rem;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(200, 16, 46, 0.2);
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .lfc-header::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    }
+    .lfc-title { color: #ffffff; font-size: 2.8rem; font-weight: 700; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+    .lfc-subtitle { color: #fca5a5; font-size: 1.2rem; margin-top: 0.5rem; font-weight: 300; }
+    
+    .card { background-color: #1e293b; padding: 1.5rem; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .card-title { font-size: 1.3rem; font-weight: 600; color: #f1f5f9; margin-bottom: 1rem; border-left: 4px solid #C8102E; padding-left: 0.75rem; }
+    
+    .score-banner {
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(90deg, #1e293b 0%, #0f172a 50%, #1e293b 100%);
+        padding: 1.5rem; border-radius: 12px; border: 1px solid #334155; margin-bottom: 1.5rem; text-align: center;
+    }
+    .score-team { flex: 1; font-size: 1.5rem; font-weight: 600; }
+    .score-number { font-size: 3.5rem; font-weight: 700; color: #ffffff; padding: 0 1.5rem; min-width: 80px; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+    .score-vs { color: #64748b; font-size: 1rem; font-weight: bold; margin-bottom: 0.5rem; }
+    
+    .timeline-item { display: flex; margin-bottom: 1rem; position: relative; padding-bottom: 1rem; border-bottom: 1px dashed #334155; }
+    .timeline-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .tl-time { font-weight: 700; color: #f87171; min-width: 50px; }
+    .tl-content { flex: 1; padding-left: 0.5rem; }
+    
+    .quote-box { background: rgba(200, 16, 46, 0.1); border-left: 4px solid #C8102E; padding: 1rem; font-style: italic; border-radius: 0 8px 8px 0; margin-top: 1rem; color: #fca5a5; }
+    
+    .comment-box { background-color: #0f172a; border-radius: 8px; border: 1px solid #334155; max-height: 400px; overflow-y: auto; padding: 1rem; }
+    .comment-item { padding: 0.75rem; border-radius: 6px; background-color: #1e293b; margin-bottom: 0.75rem; border-left: 3px solid #64748b; }
+    .comment-user { font-weight: 600; color: #f87171; font-size: 0.9rem; display: flex; justify-content: space-between; }
+    .comment-time { color: #475569; font-size: 0.8rem; font-weight: 400; }
+    .comment-text { margin-top: 0.25rem; font-size: 0.95rem; color: #cbd5e1; }
+    
+    .lfc-footer { text-align: center; margin-top: 3rem; padding: 1.5rem; border-top: 1px solid #334155; color: #64748b; font-size: 0.85rem; }
+    
+    /* HTML Table styling */
+    .lfc-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.95rem; }
+    .lfc-table th { background-color: #0f172a; color: #94a3b8; text-align: center; padding: 10px; font-weight: 600; border-bottom: 2px solid #334155; }
+    .lfc-table th.left, .lfc-table td.left { text-align: left; }
+    .lfc-table td { padding: 12px 10px; text-align: center; border-bottom: 1px solid #334155; }
+    .lfc-table tr:hover { background-color: rgba(255,255,255,0.02); }
+    
+    .badge { padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 0.8rem; color: white; display: inline-block; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
+
+# ── HEADER ──
 st.markdown(
     f'<div class="lfc-header">'
-    f'<div class="lfc-logo">JP</div>'
-    f'<div>'
-    f'<div class="lfc-title">เจมส์ป๊อก LFC {live_label}</div>'
-    f'<div class="lfc-sub">ขยี้ทุกประเด็นหงส์แดง • {META["competition"]} MW{META["matchweek"]}</div>'
-    f'</div></div>',
+    f'  <div class="lfc-title">เจมส์ป๊อก LFC</div>'
+    f'  <div class="lfc-subtitle">วิเคราะห์เจาะลึกหงส์แดง มิติใหม่แห่งการดูบอลหลังเกม</div>'
+    f'</div>',
     unsafe_allow_html=True,
 )
 
 # ══════════════════════════════════════════════════
-# TAB NAV  (Phase 4 เพิ่ม Live & Stats tabs)
+# MAIN LAYOUT
 # ══════════════════════════════════════════════════
-tabs = st.columns([1.6, 1.8, 1.4, 1.8, 2.1])
-tab_defs = [
-    ("live",     "📡 Live & ผล"),
-    ("standing", "🏆 ตารางคะแนน"),
-    ("stats",    "📊 สถิติ"),
-    ("players",  "👟 นักเตะ"),
-    ("analysis", "🗒️ วิเคราะห์โต๊ะรก"),
-]
-for col, (tid, label) in zip(tabs, tab_defs):
-    with col:
-        if st.button(label, use_container_width=True, key=f"btn_{tid}",
-                     type="primary" if st.session_state.tab == tid else "secondary"):
-            st.session_state.tab = tid; st.rerun()
+col_main, col_side = st.columns([2, 1])
 
-st.markdown("<hr style='border:none;border-top:1px solid #e5e7eb;margin:10px 0 20px;'>",
-            unsafe_allow_html=True)
+with col_main:
+    # ── BANNER MATCHWEEK & SCORE ──
+    m = md["meta"]
+    st.markdown(
+        f'<div class="score-banner">'
+        f'  <div class="score-team" style="color:{m["home_color"]}; text-align:right;">{m["home_team"]}</div>'
+        f'  <div>'
+        f'    <div class="score-vs">{m["competition"]} — นัดที่ {m["matchweek"]}</div>'
+        f'    <div style="display:flex; align-items:center;">'
+        f'      <span class="score-number">{m["home_score"]}</span>'
+        f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
+        f'      <span class="score-number">{m["away_score"]}</span>'
+        f'    </div>'
+        f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">🏟️ {m["venue"]} | 📅 {m["date"]}</div>'
+        f'  </div>'
+        f'  <div class="score-team" style="color:{m["away_color"]}; text-align:left;">{m["away_team"]}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-# ══════════════════════════════════════════════════════════════
-# TAB: LIVE & ผลล่าสุด  ← Phase 4 ใหม่
-# ══════════════════════════════════════════════════════════════
-if st.session_state.tab == "live":
-    st.markdown('<p class="sec-heading">📡 Live & ผลล่าสุด</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sec-sub">ข้อมูลจาก API-Football อัปเดตทุก 1 ชั่วโมง (วันแข่งทุก 5 นาที)</p>', unsafe_allow_html=True)
+    # ── TAB MENU ──
+    tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
+        "⏱️ ไทม์ไลน์สำคัญ", "🧐 วิเคราะห์แทคติก", "📊 สถิติทีม & นักเตะ", "🏆 ตารางคะแนน พรีเมียร์ลีก"
+    ])
 
-    col_live, col_next = st.columns([3, 2], gap="large")
-
-    with col_live:
-        # ── LIVE MATCH BANNER ──
-        if live_fix:
-            f  = live_fix["fixture"]
-            g  = live_fix["goals"]
-            ht = live_fix["teams"]["home"]
-            at = live_fix["teams"]["away"]
-            elapsed = f["status"].get("elapsed", "?")
-            st.markdown(
-                f'<div class="live-banner">'
-                f'<div>'
-                f'<div><span class="live-dot"></span><b>LIVE — {elapsed}\'</b></div>'
-                f'<div class="live-teams">{ht["name"]} vs {at["name"]}</div>'
-                f'<div style="font-size:11px;opacity:.7;">{f.get("venue",{}).get("name","")} • {COMPETITIONS.get(live_fix["league"]["id"],"")}</div>'
-                f'</div>'
-                f'<div class="live-score">{g["home"]} - {g["away"]}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            # ── NEXT MATCH ──
-            next_fix = fetch_next_fixture()
-            if next_fix:
-                nf = next_fix["fixture"]
-                nh = next_fix["teams"]["home"]["name"]
-                na = next_fix["teams"]["away"]["name"]
-                nd = fmt_date(nf["date"])
-                nv = nf.get("venue", {}).get("name", "")
-                nc = COMPETITIONS.get(next_fix["league"]["id"], next_fix["league"]["name"])
+    with tab_timeline:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        if md["timeline"]:
+            for item in md["timeline"]:
                 st.markdown(
-                    f'<div class="next-match">'
-                    f'<div class="next-label">⏰ แมตช์ถัดไป</div>'
-                    f'<div class="next-teams">{nh} vs {na}</div>'
-                    f'<div class="next-detail">{nd} • {nv}</div>'
-                    f'<div class="next-detail" style="margin-top:4px;">{nc}</div>'
+                    f'<div class="timeline-item">'
+                    f'  <div class="tl-time">{item["minute"]}</div>'
+                    f'  <div class="tl-content">'
+                    f'    <b style="color:#f1f5f9;">{item["title"]}</b>'
+                    f'    <div class="comment-text">{item["detail"]}</div>'
+                    f'  </div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-
-        # ── ผลล่าสุด 5 แมตช์ ──
-        st.markdown('<div class="subsec-heading">ผลล่าสุด 5 แมตช์</div>', unsafe_allow_html=True)
-        fixtures = fetch_last_fixtures(5)
-
-        if fixtures:
-            for fx in fixtures:
-                f   = fx["fixture"]
-                g   = fx["goals"]
-                ht  = fx["teams"]["home"]
-                at  = fx["teams"]["away"]
-                comp = COMPETITIONS.get(fx["league"]["id"], fx["league"]["name"])
-                date = fmt_date(f["date"])
-                gh, ga = g.get("home") or 0, g.get("away") or 0
-                wdl, wdl_color = result_badge(gh, ga, ht["id"])
-                st.markdown(
-                    f'<div class="fix-card">'
-                    f'<div style="flex:1;">'
-                    f'<div class="fix-teams">{ht["name"]} {gh} – {ga} {at["name"]}</div>'
-                    f'<div class="fix-comp">{comp}</div>'
-                    f'</div>'
-                    f'<div style="text-align:right;">'
-                    f'<span class="wdl-badge" style="background:{wdl_color};">{wdl}</span>'
-                    f'<div class="fix-date">{date[:10]}</div>'
-                    f'</div></div>',
-                    unsafe_allow_html=True,
-                )
         else:
-            st.info("ยังไม่มีข้อมูลผลแมตช์ — กด Refresh ด้านล่าง")
-
-        if st.button("🔄 Refresh ผล", key="refresh_fix"):
-            # ต้องย่อหน้า (Tab) ถอยเข้ามาด้านในของบล็อก if ทั้งหมดตามนี้ครับ 👇
-            for k in ["_cache_all_fixtures_all", "_cache_all_fixtures_all_ts",
-                      "_cache_live", "_cache_live_ts"]:
-                st.session_state.pop(k, None)
-            st.rerun()
-
-    with col_next:
-        # ── สถิติ 5 แมตช์ล่าสุด ──
-        st.markdown('<div class="subsec-heading">ฟอร์ม 5 แมตช์ล่าสุด</div>', unsafe_allow_html=True)
-        if fixtures:
-            w = d = l = gf = ga_count = 0
-            form_html = ""
-            for fx in fixtures[:5]:
-                g   = fx["goals"]
-                ht  = fx["teams"]["home"]
-                gh, ga = g.get("home") or 0, g.get("away") or 0
-                wdl, wdl_color = result_badge(gh, ga, ht["id"])
-                if wdl == "W": w += 1
-                elif wdl == "D": d += 1
-                else: l += 1
-                gf += gh if ht["id"] == LIVERPOOL_ID else ga
-                ga_count += ga if ht["id"] == LIVERPOOL_ID else gh
-                form_html += f'<span class="wdl-badge" style="background:{wdl_color};margin:2px;">{wdl}</span> '
-
-            st.markdown(f'<div class="card"><div style="margin-bottom:12px;">{form_html}</div>', unsafe_allow_html=True)
-            fc1, fc2, fc3 = st.columns(3)
-            with fc1:
-                st.markdown(f'<div style="text-align:center;"><div style="font-size:24px;font-weight:900;color:#16a34a;">{w}</div><div style="font-size:11px;color:#475569;">ชนะ</div></div>', unsafe_allow_html=True)
-            with fc2:
-                st.markdown(f'<div style="text-align:center;"><div style="font-size:24px;font-weight:900;color:#ca8a04;">{d}</div><div style="font-size:11px;color:#475569;">เสมอ</div></div>', unsafe_allow_html=True)
-            with fc3:
-                st.markdown(f'<div style="text-align:center;"><div style="font-size:24px;font-weight:900;color:#C8102E;">{l}</div><div style="font-size:11px;color:#475569;">แพ้</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div style="margin-top:10px;font-size:13px;color:#374151;">⚽ ยิง <b>{gf}</b> ประตู · เสีย <b>{ga_count}</b> ประตู</div></div>', unsafe_allow_html=True)
-
-        # ── Cache status ──
-        ts = st.session_state.get("_cache_fixtures_ts", 0)
-        if ts:
-            age_min = int((time.time() - ts) / 60)
-            next_min = max(0, 60 - age_min)
-            st.markdown(
-                f'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;'
-                f'padding:10px 14px;font-size:12px;color:#166534;margin-top:8px;">'
-                f'🔄 Cache อายุ {age_min} นาที · จะดึงใหม่ใน {next_min} นาที<br>'
-                f'💡 Free plan 100 req/day — cache ช่วยประหยัด quota</div>',
-                unsafe_allow_html=True,
-            )
-
-
-# ══════════════════════════════════════════════════════════════
-# TAB: ตารางคะแนน  ← Phase 4 ใหม่
-# ══════════════════════════════════════════════════════════════
-elif st.session_state.tab == "standing":
-    st.markdown('<p class="sec-heading">🏆 ตารางคะแนน</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sec-sub">ตารางล่าสุดจาก API-Football ทุก competition ที่ Liverpool เล่น</p>', unsafe_allow_html=True)
-
-    standings = fetch_standings()
-
-    if standings:
-        for comp_name, table in standings.items():
-            st.markdown(f'<div class="card"><div class="subsec-heading">{comp_name}</div>', unsafe_allow_html=True)
-
-            # แสดงแค่ 10 อันดับแรก + Liverpool ถ้าอยู่นอก top 10
-            lfc_row = next((r for r in table if r["team"]["id"] == LIVERPOOL_ID), None)
-            show_rows = table[:10]
-            lfc_in_top10 = any(r["team"]["id"] == LIVERPOOL_ID for r in show_rows)
-
-            rows_html = ""
-            for r in show_rows:
-                is_lfc = r["team"]["id"] == LIVERPOOL_ID
-                cls    = "highlight-lfc" if is_lfc else ""
-                name   = r["team"]["name"]
-                rows_html += (
-                    f'<tr class="{cls}">'
-                    f'<td>{r["rank"]}. {name}</td>'
-                    f'<td>{r["all"]["played"]}</td>'
-                    f'<td>{r["all"]["win"]}</td>'
-                    f'<td>{r["all"]["draw"]}</td>'
-                    f'<td>{r["all"]["lose"]}</td>'
-                    f'<td>{r["goalsDiff"]}</td>'
-                    f'<td><b>{r["points"]}</b></td>'
-                    f'</tr>'
-                )
-
-            # แสดง LFC แยกถ้าอยู่นอก top 10
-            if not lfc_in_top10 and lfc_row:
-                rows_html += (
-                    f'<tr><td colspan="7" style="text-align:center;color:#94a3b8;font-size:11px;">...</td></tr>'
-                    f'<tr class="highlight-lfc">'
-                    f'<td>{lfc_row["rank"]}. {lfc_row["team"]["name"]}</td>'
-                    f'<td>{lfc_row["all"]["played"]}</td>'
-                    f'<td>{lfc_row["all"]["win"]}</td>'
-                    f'<td>{lfc_row["all"]["draw"]}</td>'
-                    f'<td>{lfc_row["all"]["lose"]}</td>'
-                    f'<td>{lfc_row["goalsDiff"]}</td>'
-                    f'<td><b>{lfc_row["points"]}</b></td>'
-                    f'</tr>'
-                )
-
-            st.markdown(
-                f'<table class="stand-table">'
-                f'<thead><tr><th>ทีม</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>'
-                f'<tbody>{rows_html}</tbody></table></div>',
-                unsafe_allow_html=True,
-            )
-    else:
-        st.info("ยังไม่มีข้อมูลตาราง — กด Refresh")
-
-    if st.button("🔄 Refresh ตาราง", key="refresh_stand"):
-        for k in ["_cache_standings", "_cache_standings_ts"]:
-            st.session_state.pop(k, None)
-        st.rerun()
-
-
-# ══════════════════════════════════════════════════════════════
-# TAB: สถิติแมตช์ (จาก match_data.json เดิม)
-# ══════════════════════════════════════════════════════════════
-elif st.session_state.tab == "stats":
-    st.markdown('<p class="sec-heading">เจาะสถิติ ฟ้องด้วยตัวเลข</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sec-sub">สถิติเจาะลึกแมตช์ล่าสุด Liverpool vs Chelsea</p>', unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2, gap="large")
-    with c1:
-        st.markdown('<div class="card"><p style="font-size:16px;font-weight:800;color:#0f172a;text-align:center;margin-bottom:6px;">สถิติภาพรวมเกมรุกและรับ</p>', unsafe_allow_html=True)
-        rl = STATS["radar_labels"] + [STATS["radar_labels"][0]]
-        hv = STATS["home_values"]  + [STATS["home_values"][0]]
-        av = STATS["away_values"]  + [STATS["away_values"][0]]
-        fr = go.Figure()
-        fr.add_trace(go.Scatterpolar(r=hv, theta=rl, fill="toself", name=META["home_short"],
-            line=dict(color="#C8102E",width=2), fillcolor="rgba(200,16,46,0.15)", marker=dict(color="#C8102E")))
-        fr.add_trace(go.Scatterpolar(r=av, theta=rl, fill="toself", name=META["away_short"],
-            line=dict(color="#1d4ed8",width=2), fillcolor="rgba(29,78,216,0.15)", marker=dict(color="#1d4ed8")))
-        fr.update_layout(
-            polar=dict(radialaxis=dict(visible=True,range=[0,100],tickfont=dict(size=10,color="#475569")),
-                       angularaxis=dict(tickfont=dict(size=11,color="#1e293b")),bgcolor="#f8fafc"),
-            legend=dict(orientation="h",y=-0.18,x=0.5,xanchor="center",font=dict(size=13,color="#1e293b")),
-            paper_bgcolor="#ffffff", margin=dict(l=40,r=40,t=20,b=60), height=360)
-        st.plotly_chart(fr, use_container_width=True, config={"displayModeBar":False})
+            st.info("ไม่มีข้อมูลไทม์ไลน์ในแมตช์นี้")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with c2:
-        sm = {"red":('<div class="stat-card-red">','stat-num-red'),
-              "blue":('<div class="stat-card-blue">','stat-num-blue'),
-              "gray":('<div class="stat-card-gray">','stat-num-gray')}
-        qs = STATS["quick"]
-        s1, s2 = st.columns(2)
-        with s1:
-            t,n = sm[qs[0]["style"]]
-            st.markdown(f'{t}<div class="{n}">{qs[0]["value"]}</div><div class="stat-label">{qs[0]["label"]}</div></div>', unsafe_allow_html=True)
-        with s2:
-            t,n = sm[qs[1]["style"]]
-            st.markdown(f'{t}<div class="{n}">{qs[1]["value"]}</div><div class="stat-label">{qs[1]["label"]}</div></div>', unsafe_allow_html=True)
-        t,n = sm[qs[2]["style"]]
-        st.markdown(f'{t}<div class="{n}">{qs[2]["value"]}</div><div class="stat-label">{qs[2]["label"]}</div></div>', unsafe_allow_html=True)
+    with tab_analysis:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        an = md["analysis"]
+        st.markdown(f'<div class="card-title">{an["title"]}</div>', unsafe_allow_html=True)
+        st.write(an["body"])
+        if an["quote"]:
+            st.markdown(f'<div class="quote-box">{an["quote"]}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        spot_rows = []
-        for s in SPOT["stats"]:
-            row = (f'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
-                   f'<span style="font-size:13px;font-weight:600;color:#374151;">{s["label"]}</span>'
-                   f'<span style="font-weight:800;color:#1e293b;">{s["value"]}</span></div>')
-            if s["pct"] is not None:
-                row += (f'<div style="background:#e5e7eb;border-radius:9999px;height:7px;margin:5px 0 10px;">'
-                        f'<div style="background:#C8102E;border-radius:9999px;height:7px;width:{s["pct"]}%;"></div></div>')
-            spot_rows.append(row)
+    with tab_stats:
+        # สถิติเปรียบเทียบทีมเดิม (พล็อตด้วย Plotly)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">เปรียบเทียบสถิติทีมหลังเกม</div>', unsafe_allow_html=True)
+        s_home = md["stats"].get("home", {})
+        s_away = md["stats"].get("away", {})
+        
+        if s_home:
+            categories = list(s_home.keys())
+            home_vals  = [float(str(v).replace('%','')) for v in s_home.values()]
+            away_vals  = [float(str(v).replace('%','')) for v in s_away.values()]
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                y=categories, x=home_vals, name=m["home_team"],
+                orientation='h', marker_color=m["home_color"], text=list(s_home.values()), textposition='auto'
+            ))
+            fig.add_trace(go.Bar(
+                y=categories, x=away_vals, name=m["away_team"],
+                orientation='h', marker_color=m["away_color"], text=list(s_away.values()), textposition='auto'
+            ))
+            fig.update_layout(
+                barmode='group', height=350, margin=dict(l=20, r=20, t=20, b=20),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#94a3b8', family='Sarabun'),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            fig.update_xaxes(showgrid=True, gridcolor='#334155')
+            fig.update_yaxes(showgrid=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("ไม่มีข้อมูลสถิติทีมสำหรับนัดนี้")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # 👟 สถิตินักเตะดาวซัลโวพรีเมียร์ลีก (ดึงอัตโนมัติจากค่ายใหม่)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">👟 สถิติดาวซัลโวรวมพรีเมียร์ลีก</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#64748b; font-size:0.85rem; margin:-0.5rem 0 1rem 0;">ข้อมูลสดอัปเดตอัตโนมัติจากเซิร์ฟเวอร์</div>', unsafe_allow_html=True)
+        
+        p_stats = fetch_player_stats("PL")
+        if p_stats:
+            html_p = """<table class="lfc-table">
+            <tr><th class="left">นักเตะ</th><th>สังกัดทีม</th><th>⚽ ประตู</th><th>🅰️ แอสซิสต์</th></tr>"""
+            for row in p_stats:
+                p_name = row["player"]["name"]
+                t_name = row["statistics"][0]["team"]["name"]
+                goals  = row["statistics"][0]["goals"]["total"]
+                asst   = row["statistics"][0]["goals"]["assists"] or 0
+                html_p += f'<tr><td class="left" style="font-weight:600; color:#f1f5f9;">{p_name}</td><td>{t_name}</td><td style="color:#eab308;font-weight:700;">{goals}</td><td>{asst}</td></tr>'
+            html_p += "</table>"
+            st.markdown(html_p, unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ ไม่มีข้อมูลสถิตินักเตะดาวซัลโวในขณะนี้")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab_standings:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">🏆 ตารางคะแนน Premier League 2024/25</div>', unsafe_allow_html=True)
+        
+        standings_data = fetch_standings()
+        if "Premier League" in standings_data and len(standings_data["Premier League"]) > 0:
+            table_data = standings_data["Premier League"]
+            
+            # ตรวจดึงสถานะความขาดของแต้มจากแถวแรกสุดมาเช็กเอฟเฟคแชมป์
+            has_champ = table_data[0].get("is_champion_decided", False)
+            champ_name = table_data[0].get("champion_name", "")
+
+            # 🎆 หากผลลัพธ์ผ่านเงื่อนไขแต้มขาดอย่างเป็นทางการ ยิงเอฟเฟคพลุฉลองรัวๆ 5 วินาทีทันที!
+            if has_champ:
+                components.html(
+                    f"""
+                    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+                    <div id="champ-popup" style="
+                        text-align: center; 
+                        padding: 20px; 
+                        background: linear-gradient(135deg, #1e1b4b, #311015); 
+                        border: 3px solid #eab308; 
+                        border-radius: 12px;
+                        box-shadow: 0 0 30px rgba(234, 179, 8, 0.4);
+                        animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                        font-family: sans-serif;
+                        margin-bottom: 25px;
+                    ">
+                        <h1 style="color: #eab308; margin: 0; font-size: 2.5rem; text-transform: uppercase; letter-spacing: 2px;">
+                            🏆 CHAMPION 🏆
+                        </h1>
+                        <p style="color: #ffffff; font-size: 1.2rem; margin: 10px 0 0 0;">
+                            ยินดีด้วยกับสโมสร <b>{champ_name}</b> คว้าแชมป์พรีเมียร์ลีกฤดูกาลนี้อย่างเป็นทางการ! แต้มขาดลอยแล้ว!
+                        </p>
+                    </div>
+
+                    <style>
+                        @keyframes popIn {{
+                            0% {{ transform: scale(0.7); opacity: 0; }}
+                            100% {{ transform: scale(1); opacity: 1; }}
+                        }}
+                    </style>
+
+                    <script>
+                        var duration = 5 * 1000;
+                        var end = Date.now() + duration;
+
+                        (function frame() {{
+                            confetti({{ particleCount: 5, angle: 60, spread: 55, origin: {{ x: 0, y: 0.8 }} }});
+                            confetti({{ particleCount: 5, angle: 120, spread: 55, origin: {{ x: 1, y: 0.8 }} }});
+                            if (Date.now() < end) {{
+                                requestAnimationFrame(frame);
+                            }}
+                        }}());
+                    </script>
+                    """,
+                    height=150,
+                )
+
+            # สร้างโครงสร้างตาราง HTML
+            html_table = """<table class="lfc-table">
+            <tr><th>อันดับ</th><th class="left">สโมสร</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้-เสีย</th><th>+/-</th><th style="color:#eab308;">แต้ม</th></tr>"""
+            
+            for r in table_data:
+                # 💡 ไฮไลท์สีทองเฉพาะทีมอันดับ 1
+                if r["rank"] == 1:
+                    row_style = 'style="background: linear-gradient(90deg, rgba(234,179,8,0.15) 0%, rgba(0,0,0,0) 100%); font-weight: bold; border-left: 5px solid #eab308;"'
+                    rank_badge = '<span style="background:#eab308; color:#000; padding:2px 6px; border-radius:4px; font-size:0.85rem; font-weight:bold;">1 🥇</span>'
+                else:
+                    row_style = ''
+                    rank_badge = f'<span>{r["rank"]}</span>'
+
+                t_name = r["team"]["name"]
+                crest  = r["team"]["logo"]
+                played = r["all"]["played"]
+                win    = r["all"]["win"]
+                draw   = r["all"]["draw"]
+                lose   = r["all"]["lose"]
+                gf     = r["all"]["goals"]["for"]
+                ga     = r["all"]["goals"]["against"]
+                gd     = r["goalsDiff"]
+                pts    = r["points"]
+                
+                logo_html = f'<img src="{crest}" width="22" style="margin-right:8px; vertical-align:middle; max-height:22px;">' if crest else ""
+                
+                html_table += f"""<tr {row_style}>
+                    <td>{rank_badge}</td>
+                    <td class="left" style="font-weight:600;">{logo_html}{t_name}</td>
+                    <td>{played}</td>
+                    <td>{win}</td>
+                    <td>{draw}</td>
+                    <td>{lose}</td>
+                    <td style="color:#64748b; font-size:0.85rem;">{gf}:{ga}</td>
+                    <td style="color:{'#16a34a' if gd >= 0 else '#dc2626'}">{'+' if gd > 0 else ''}{gd}</td>
+                    <td style="color:#eab308; font-weight:bold; font-size:1.05rem;">{pts}</td>
+                </tr>"""
+            html_table += "</table>"
+            st.markdown(html_table, unsafe_allow_html=True)
+        else:
+            st.info("ไม่พบข้อมูลตารางคะแนนพรีเมียร์ลีกในขณะนี้")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+with col_side:
+    # ── LIVE MATCH TICKER (เตะสด) ──
+    live_fix = fetch_live_fixture()
+    if live_fix:
+        st.markdown('<div class="card" style="border: 1px solid #16a34a; background-color: rgba(22,163,74,0.05);">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="color:#16a34a; border-left-color:#16a34a;">🔴 LIVE MATCH NOW</div>', unsafe_allow_html=True)
+        lt = live_fix["teams"]
+        lg = live_fix.get("goals")
         st.markdown(
-            f'<div class="card card-gold-border" style="margin-top:12px;">'
-            f'<div style="font-size:14px;font-weight:800;color:#1e293b;margin-bottom:7px;">🌟 Spotlight: {SPOT["name"]} ({SPOT["age"]} ปี)</div>'
-            f'<div style="color:#374151;font-size:13px;margin-bottom:10px;">ดาวรุ่งที่โชว์ฟอร์มได้โดดเด่นที่สุดในแนวรุก</div>'
-            f'{"".join(spot_rows)}'
-            f'<div style="font-size:11px;color:#64748b;margin-top:8px;font-style:italic;">{SPOT["note"]}</div></div>',
+            f'<div style="text-align:center; padding:0.5rem 0;">'
+            f'  <div style="font-size:1.1rem; font-weight:600; color:#cbd5e1;">{lt["home"]["name"]} vs {lt["away"]["name"]}</div>'
+            f'  <div style="font-size:2.5rem; font-weight:700; color:#16a34a; margin:0.25rem 0;">{lg["home"]} - {lg["away"]}</div>'
+            f'  <span class="badge" style="background-color:#16a34a; animation: pulse 1.5s infinite;">กำลังแข่งขัน</span>'
+            f'</div>',
             unsafe_allow_html=True,
         )
-
-    dc, mc = st.columns([1, 2], gap="large")
-    with dc:
-        st.markdown('<div class="card"><p style="font-size:16px;font-weight:800;color:#0f172a;text-align:center;margin-bottom:6px;">การครองบอล</p>', unsafe_allow_html=True)
-        poss = STATS["possession"]
-        fd = go.Figure(go.Pie(
-            labels=[META["home_short"], META["away_short"]], values=[poss["home"], poss["away"]],
-            hole=0.6, marker=dict(colors=["#C8102E","#1d4ed8"],line=dict(color="#fff",width=3)),
-            textinfo="label+percent", textfont=dict(size=14,color="#fff"), insidetextorientation="auto"))
-        fd.add_annotation(text=f"<b>{poss['home']}%</b><br><span style='font-size:11px'>LIV</span>",
-                          x=0.5, y=0.5, showarrow=False, font=dict(size=16,color="#C8102E"))
-        fd.update_layout(showlegend=False, paper_bgcolor="#ffffff", margin=dict(l=10,r=10,t=10,b=10), height=220)
-        st.plotly_chart(fd, use_container_width=True, config={"displayModeBar":False})
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with mc:
-        st.markdown('<div class="card"><p style="font-size:16px;font-weight:800;color:#0f172a;text-align:center;margin-bottom:4px;">โมเมนตัมการบุก</p><p style="color:#64748b;font-size:12px;text-align:center;margin-bottom:8px;">บวก = หงส์บุก · ลบ = สิงห์บุก</p>', unsafe_allow_html=True)
-        mx   = STATS["momentum_x"]
-        my   = STATS["momentum_y"]
-        tips = {int(k): v for k, v in STATS["momentum_tips"].items()}
-        ptc  = ["#C8102E" if i in tips else "#1e293b" for i in range(len(my))]
-        hov  = [tips.get(i, f"โมเมนตัม: {v}") for i, v in enumerate(my)]
-        fm = go.Figure()
-        fm.add_hrect(y0=0,y1=10,fillcolor="rgba(200,16,46,0.05)",line_width=0)
-        fm.add_hrect(y0=-10,y1=0,fillcolor="rgba(29,78,216,0.05)",line_width=0)
-        fm.add_trace(go.Scatter(x=mx,y=my,mode="lines+markers",
-            line=dict(color="#1e293b",width=3,shape="spline"),fill="tozeroy",
-            fillcolor="rgba(30,41,59,0.08)",
-            marker=dict(size=9,color=ptc,line=dict(color="#fff",width=2)),
-            hovertext=hov,hoverinfo="text"))
-        fm.add_hline(y=0,line_color="#0f172a",line_width=1.5)
-        fm.add_annotation(x="15",y=5,text="🔴 LFC",showarrow=False,font=dict(color="#C8102E",size=11),yshift=16)
-        fm.add_annotation(x="75",y=-8,text="🔵 CHE",showarrow=False,font=dict(color="#1d4ed8",size=11),yshift=-18)
-        fm.update_layout(
-            xaxis=dict(title="นาที",tickfont=dict(size=11,color="#1e293b"),gridcolor="#e5e7eb"),
-            yaxis=dict(range=[-10,10],showticklabels=False,gridcolor="#e5e7eb"),
-            paper_bgcolor="#ffffff",plot_bgcolor="#ffffff",
-            showlegend=False,margin=dict(l=16,r=16,t=8,b=36),height=220)
-        st.plotly_chart(fm, use_container_width=True, config={"displayModeBar":False})
-        st.markdown('</div>', unsafe_allow_html=True)
+    # ── NEXT FIXTURE (นัดถัดไป) ──
+    next_fix = fetch_next_fixture()
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">📅 โปรแกรมนัดถัดไป</div>', unsafe_allow_html=True)
+    if next_fix:
+        nt = next_fix["teams"]
+        nc = COMPETITIONS.get(next_fix["league"]["id"], next_fix["league"]["name"])
+        st.markdown(
+            f'<div style="font-size:0.85rem; color:#64748b; font-weight:600; text-transform:uppercase; margin-bottom:0.25rem;">🏆 {nc}</div>'
+            f'<div style="font-size:1.1rem; font-weight:600; color:#f1f5f9; margin-bottom:0.5rem;">{nt["home"]["name"]} <span style="color:#64748b;font-size:0.9rem;">vs</span> {nt["away"]["name"]}</div>'
+            f'<div style="font-size:0.9rem; color:#cbd5e1;">⏰ {fmt_date(next_fix["fixture"]["date"])}</div>'
+            f'<div style="font-size:0.85rem; color:#64748b; margin-top:0.25rem;">🏟️ {next_fix["fixture"]["venue"]["name"]}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown('<div style="color:#64748b;font-size:0.9rem;">ไม่พบโปรแกรมแข่งขันที่กำลังมาถึง</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-
-# ══════════════════════════════════════════════════════════════
-# TAB: สถิตินักเตะ  ← Phase 4 ใหม่
-# ══════════════════════════════════════════════════════════════
-elif st.session_state.tab == "players":
-    st.markdown('<p class="sec-heading">👟 สถิตินักเตะ Liverpool</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sec-sub">ข้อมูลจาก API-Football · Premier League Season 2024</p>', unsafe_allow_html=True)
-
-    players = fetch_player_stats(39)  # PL
-
-    if players:
-        # ── Bar Chart Goals+Assists ──
-        names  = [p["player"]["name"].split(" ")[-1] for p in players]
-        goals  = [p["statistics"][0]["goals"]["total"] or 0 for p in players]
-        assists= [p["statistics"][0]["goals"]["assists"] or 0 for p in players]
-
-        fig_p = go.Figure()
-        fig_p.add_trace(go.Bar(name="Goals",   x=names, y=goals,
-            marker_color="#C8102E", text=goals, textposition="outside",
-            textfont=dict(size=12,color="#0f172a")))
-        fig_p.add_trace(go.Bar(name="Assists", x=names, y=assists,
-            marker_color="#F6EB61", text=assists, textposition="outside",
-            textfont=dict(size=12,color="#0f172a")))
-        fig_p.update_layout(
-            barmode="group",
-            paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-            legend=dict(orientation="h",y=-0.2,font=dict(color="#1e293b")),
-            xaxis=dict(tickfont=dict(size=12,color="#1e293b")),
-            yaxis=dict(gridcolor="#e5e7eb",tickfont=dict(color="#475569")),
-            margin=dict(l=10,r=10,t=20,b=60), height=320)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.plotly_chart(fig_p, use_container_width=True, config={"displayModeBar":False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # ── Player Detail List ──
-        st.markdown('<div class="card"><div class="subsec-heading">รายละเอียดนักเตะ</div>', unsafe_allow_html=True)
-        for i, p in enumerate(players, 1):
-            pl   = p["player"]
-            st_  = p["statistics"][0]
-            pos  = st_.get("games", {}).get("position", "")
-            g    = st_.get("goals", {}).get("total") or 0
-            a    = st_.get("goals", {}).get("assists") or 0
-            apps = st_.get("games", {}).get("appearences") or 0
-            mins = st_.get("games", {}).get("minutes") or 0
-            shots= st_.get("shots", {}).get("total") or 0
-            pas  = st_.get("passes", {}).get("accuracy") or 0
-
+    # ── LAST 5 MATCHES (ฟอร์มล่าสุดย้อนหลัง) ──
+    last_fixtures = fetch_last_fixtures(5)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">🕒 ผลการแข่งขัน 5 นัดหลังสุด</div>', unsafe_allow_html=True)
+    if last_fixtures:
+        for fx in last_fixtures:
+            t = fx["teams"]
+            g = fx["goals"]
+            comp = COMPETITIONS.get(fx["league"]["id"], fx["league"]["name"])
+            badge_txt, badge_color = result_badge(g["home"], g["away"], t["home"]["id"])
+            
             st.markdown(
-                f'<div class="player-row">'
-                f'<div class="player-num">{i}</div>'
-                f'<div class="player-name">{pl["name"]}'
-                f'<span class="player-pos">({pos})</span></div>'
-                f'<div class="player-stat"><div class="player-stat-val">{g}</div>'
-                f'<div class="player-stat-lbl">Goals</div></div>'
-                f'<div class="player-stat"><div class="player-stat-val">{a}</div>'
-                f'<div class="player-stat-lbl">Assists</div></div>'
-                f'<div class="player-stat"><div class="player-stat-val">{apps}</div>'
-                f'<div class="player-stat-lbl">Apps</div></div>'
-                f'<div class="player-stat" style="display:none" data-mobile-hide>'
-                f'<div class="player-stat-val">{mins}</div>'
-                f'<div class="player-stat-lbl">Mins</div></div>'
+                f'<div style="display:flex; align-items:center; justify-content:between; margin-bottom:0.75rem; font-size:0.9rem; border-bottom:1px solid #1e293b; padding-bottom:0.5rem;">'
+                f'  <div style="flex:1; padding-right:0.5rem;">'
+                f'    <div style="font-size:0.75rem; color:#475569; font-weight:600;">🏆 {comp}</div>'
+                f'    <div style="font-weight:600; color:#cbd5e1; margin:0.1rem 0;">{t["home"]["name"]} {g["home"]}-{g["away"]} {t["away"]["name"]}</div>'
+                f'    <div style="font-size:0.8rem; color:#64748b;">{fmt_date(fx["fixture"]["date"])}</div>'
+                f'  </div>'
+                f'  <div style="text-align:right;">'
+                f'    <span class="badge" style="background-color:{badge_color}; min-width:24px; text-align:center;">{badge_txt}</span>'
+                f'  </div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
-        st.markdown('</div>', unsafe_allow_html=True)
-
     else:
-        st.info("ยังไม่มีข้อมูลนักเตะ — กด Refresh")
+        st.markdown('<div style="color:#64748b;font-size:0.9rem;">ยังไม่มีบันทึกข้อมูลฟอร์มย้อนหลัง</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("🔄 Refresh นักเตะ", key="refresh_players"):
-        for k in ["_cache_players", "_cache_players_ts"]:
-            st.session_state.pop(k, None)
-        st.rerun()
-
-
-# ══════════════════════════════════════════════════════════════
-# TAB: วิเคราะห์ + Comments (Phase 3)
-# ══════════════════════════════════════════════════════════════
-elif st.session_state.tab == "analysis":
-    st.markdown('<p class="sec-heading">โต๊ะรก วิจารณ์</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sec-sub">ถึงเวลาตบขมับ! วิเคราะห์เจาะลึกแบบไม่เกรงใจใคร สไตล์ เจมส์ป๊อก LFC</p>', unsafe_allow_html=True)
-
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.markdown(
-            f'<div class="editor-card">'
-            f'<div class="editor-title">{ANA["title"]}</div>'
-            f'<div class="editor-body">{ANA["body"]}</div>'
-            f'<div class="editor-quote">{ANA["quote"]}</div></div>',
-            unsafe_allow_html=True,
-        )
-        # Quotes from JSON
-        st.markdown('<div style="margin-top:16px;"></div>', unsafe_allow_html=True)
-        for q in QUOTES:
-            is_hot = q["style"] == "hot"
+    # ── RIVAL MONITOR ──
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">👀 ซูมฟอร์มคู่แข่งทีมสำคัญ</div>', unsafe_allow_html=True)
+    if md.get("rival_compare"):
+        for r in md["rival_compare"]:
             st.markdown(
-                f'<div class="{"card card-red-border" if is_hot else "card"}">'
-                f'<span class="quote-label" style="color:#C8102E;">{q["speaker"]}</span>'
-                f'<div class="{"quote-bold" if is_hot else "quote-text"}">{q["quote"]}</div>'
-                f'<div class="quote-note">{q["note"]}</div></div>',
+                f'<div style="margin-bottom:0.75rem; font-size:0.9rem; padding-bottom:0.5rem; border-bottom:1px solid #1e293b;">'
+                f'  <div style="display:flex; justify-content:space-between; font-weight:600; color:#e2e8f0;">'
+                f'    <span>{r["team"]}</span>'
+                f'    <span style="color:#eab308;">{r["points"]} แต้ม (นัดที่ {r["played"]})</span>'
+                f'  </div>'
+                f'  <div style="font-size:0.8rem; color:#64748b; margin-top:0.15rem;">📌 นัดล่าสุด: {r["last_match"]}</div>'
+                f'  <div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">{r["status_comment"]}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
+    else:
+        st.info("ไม่มีข้อมูลฟอร์มทีมคู่แข่ง")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with right:
-        riv_color = RIV.get("rival_color","#ef4444")
+    # ── POLLING ENGINE & COMMENTS — Phase 3 ──
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="card-title">🗳️ โพลล์แฟนบอล: {POLL_QUESTION}</div>', unsafe_allow_html=True)
+
+    if "comments" not in st.session_state:
+        st.session_state.comments = fetch_comments()
+
+    # นับคะแนนโหวตสดๆ จาก Sheets เพื่อสร้าง Real-time Chart
+    agree_count = sum(1 for c in st.session_state.comments if c["text"] == AGREE_TEXT)
+    disagree_count = sum(1 for c in st.session_state.comments if c["text"] == DISAGREE_TEXT)
+    total_votes = agree_count + disagree_count
+
+    if total_votes > 0:
+        pct_agree = int((agree_count / total_votes) * 100)
+        pct_disagree = 100 - pct_agree
+        
+        # แสดงผลแท่งสัดส่วนสไตล์โหวตสวยๆ
         st.markdown(
-            f'<div class="compare-box">'
-            f'<div class="compare-title">เปรียบเทียบคู่แค้น</div>'
-            f'<div class="compare-body">{RIV["context"]}</div>'
-            f'<div class="compare-row">'
-            f'<div><div class="compare-liv">{META["home_short"]}</div>'
-            f'<div class="compare-liv-sub">{RIV["home_desc"]}</div></div>'
-            f'<div class="compare-vs">VS</div>'
-            f'<div><div class="compare-riv" style="color:{riv_color};">{RIV["rival_short"]}</div>'
-            f'<div class="compare-riv-sub">{RIV["rival_desc"]}</div></div>'
-            f'</div></div>',
+            f'<div style="margin-bottom: 1rem; font-size:0.9rem;">'
+            f'  <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">'
+            f'    <span style="color:#f87171;font-weight:600;">🔴 ดื้อ ({agree_count} คน)</span>'
+            f'    <span style="color:#94a3b8;font-weight:600;">⚪ ให้โอกาส ({disagree_count} คน)</span>'
+            f'  </div>'
+            f'  <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; background-color:#334155;">'
+            f'    <div style="width:{pct_agree}%; background-color:#C8102E; height:100%;"></div>'
+            f'    <div style="width:{pct_disagree}%; background-color:#94a3b8; height:100%;"></div>'
+            f'  </div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
-        # Romano + Gravenberch
-        st.markdown(
-            f'<div class="grav-card"><div class="grav-icon">🗣️</div><div>'
-            f'<div class="grav-label">ไรอัน กราเฟนแบร์ก</div>'
-            f'<div class="grav-quote">{GRAV["quote"]}</div>'
-            f'<div class="grav-desc">{GRAV["detail"]}</div></div></div>'
-            f'<div class="romano-box"><div style="font-size:26px;flex-shrink:0;">📰</div><div>'
-            f'<div class="romano-title">Fabrizio Romano Update</div>'
-            f'<div class="romano-text">{ROM["update"]}</div></div></div>',
-            unsafe_allow_html=True,
+    # ส่วนแสดงกล่องกรอกคอมเมนต์และกดโหวต
+    username = st.text_input("💬 ชื่อเล่นของคุณ :", placeholder="เช่น บังโมเมืองนนท์", max_chars=20)
+
+    def render_comment(c) -> str:
+        border_cls = 'style="border-left: 4px solid #C8102E;"' if c["border"] == "True" else ""
+        return (
+            f'<div class="comment-item" {border_cls}>'
+            f'  <div class="comment-user">{c["user"]} <span class="comment-time">🕒 {c["ts"]}</span></div>'
+            f'  <div class="comment-text">{c["text"]}</div>'
+            f'</div>'
         )
 
-        # ── Comment Box (Phase 3 Sheets) ──
-        st.markdown(
-            '<div class="comment-box" style="margin-top:14px;">'
-            '<div class="sheets-badge">🗄️ Google Sheets — คอมเมนต์ถาวร</div>'
-            '<div class="comment-title">เพื่อนๆ คิดยังไง?</div>',
-            unsafe_allow_html=True,
-        )
-        nc, ac, dc = st.columns([2, 1.4, 1.8])
-        with nc:
-            username = st.text_input("ชื่อ", placeholder="เช่น Kopite_1989",
-                                     label_visibility="collapsed", key="uname")
-        with ac:
-            if st.button("🔴 ไล่สล็อตออก!", key="agree_btn", use_container_width=True):
-                name = username.strip() or f"Fan_{random.randint(1,999)}"
-                if push_comment(name, AGREE_TEXT):
-                    st.session_state.comments = fetch_comments()
-                    st.rerun()
-        with dc:
-            if st.button("⚪ ให้โอกาสไปก่อน", key="disagree_btn", use_container_width=True):
-                name = username.strip() or f"Fan_{random.randint(1,999)}"
-                if push_comment(name, DISAGREE_TEXT):
-                    st.session_state.comments = fetch_comments()
-                    st.rerun()
-
-        rc, _ = st.columns([1, 3])
-        with rc:
-            if st.button("🔄 โหลดใหม่", key="reload_btn", use_container_width=True):
+    st.markdown('<div class="comment-box">', unsafe_allow_html=True)
+    
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        if st.button("🔴 ดื้อเกินไปจริง!", key="agree_btn", use_container_width=True):
+            name = username.strip() or f"Fan_{random.randint(1,999)}"
+            if push_comment(name, AGREE_TEXT, border=True):
+                st.session_state.comments = fetch_comments()
+                st.rerun()
+    with col_v2:
+        if st.button("⚪ ให้โอกาสไปก่อน", key="disagree_btn", use_container_width=True):
+            name = username.strip() or f"Fan_{random.randint(1,999)}"
+            if push_comment(name, DISAGREE_TEXT):
                 st.session_state.comments = fetch_comments()
                 st.rerun()
 
-        if st.session_state.comments:
-            st.markdown("".join(render_comment(c) for c in st.session_state.comments[:10]),
-                        unsafe_allow_html=True)
+    # ช่องทางพิมพ์ข้อความคอมเมนต์อิสระ
+    custom_comment = st.text_input("✍️ พิมพ์ข้อความแสดงความเห็นเพิ่มเติม :", placeholder="ใส่ความคิดเห็นหลังเกมของคุณที่นี่...", max_chars=100)
+    if st.button("🚀 ส่งความเห็น", key="custom_msg_btn", use_container_width=True):
+        txt = custom_comment.strip()
+        if txt:
+            name = username.strip() or f"Fan_{random.randint(1,999)}"
+            if push_comment(name, txt, border=False):
+                st.session_state.comments = fetch_comments()
+                st.rerun()
         else:
-            st.markdown('<div class="comment-item" style="color:#94a3b8;text-align:center;">ยังไม่มีคอมเมนต์ เป็นคนแรกได้เลย! 👆</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.warning("⚠️ กรุณากรอกข้อความก่อนกดส่งครับ")
 
+    rc, _ = st.columns([1, 3])
+    with rc:
+        if st.button("🔄 โหลดใหม่", key="reload_btn", use_container_width=True):
+            st.session_state.comments = fetch_comments()
+            st.rerun()
+
+    if st.session_state.comments:
+        st.markdown("".join(render_comment(c) for c in st.session_state.comments[:10]), unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="comment-item" style="color:#94a3b8;text-align:center;">ยังไม่มีคอมเมนต์ เป็นคนแรกได้เลย! 👆</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
 st.markdown(
     f'<div class="lfc-footer">'
-    f'<div class="footer-title">เจมส์ป๊อก LFC</div>'
-    f'<div class="footer-ref">Data: API-Football • Google Sheets • {META["competition"]} {META["date"]}</div>'
-    f'<div class="footer-copy">&copy; 2026 JamesPok LFC — Phase 4 · Full Stack Edition 🔗🗄️🐍</div>'
+    f'  <div class="footer-credit">© 2026 JamesPok LFC Dashboard. All Rights Reserved.</div>'
+    f'  <div style="margin-top:0.25rem; font-size:0.75rem; color:#475569;">Powered by Streamlit Cloud & Football-Data.org API</div>'
     f'</div>',
     unsafe_allow_html=True,
 )
