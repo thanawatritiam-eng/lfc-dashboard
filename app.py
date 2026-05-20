@@ -16,7 +16,6 @@ from googleapiclient.discovery import build
 def get_match_timeline_from_gemini(home_team, away_team, date):
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # บังคับวิ่งไปที่ v1 สตรีมหลักชัดเจน หมดปัญหา v1beta ทันที
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -32,9 +31,18 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     try:
         response = requests.post(url, headers=headers, json=payload)
         res_data = response.json()
+        
+        # ── เพิ่มส่วนนี้เพื่อตรวจสอบว่าเกิด Error จากฝั่ง Google หรือไม่ ──
+        if "error" in res_data:
+            st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
+            st.warning(f"รายละเอียดเชิงลึก: {res_data['error']}")
+            return []
+            
+        # แกะข้อมูลเมื่อรันผ่านปกติ
         ai_response_text = res_data['candidates'][0]['content']['parts'][0]['text']
         clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
+        
     except Exception as e:
         st.error(f"⚠️ AI เกิดข้อผิดพลาดในการวิเคราะห์: {e}")
         return []
