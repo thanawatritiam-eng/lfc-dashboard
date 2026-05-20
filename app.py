@@ -30,19 +30,19 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     # 1. เปลี่ยนมาใช้โมเดล gemini-1.0-pro ซึ่งรองรับในทุกบัญชีและเสถียรมาก
    def get_match_timeline_from_gemini(home_team, away_team, date):
-    # ลบการคอนฟิกที่ซับซ้อนออก ให้เหลือแค่ API Key
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
-    
-    # ใช้รุ่นล่าสุดที่รองรับทั่วโลก
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    prompt = f"วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} (ขอผลเป็น JSON เท่านั้นไม่มีข้อความอื่น)"
+    prompt = f"""
+    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
+    ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
+    ขอในรูปแบบ JSON เท่านั้น ดังนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    ห้ามมีข้อความอื่นนอกจาก JSON
+    """
     
-    # ตัด generation_config ออกไปเลย
     response = model.generate_content(prompt)
-    
-    return json.loads(response.text.replace("```json", "").replace("```", "").strip())
-
+    clean_text = response.text.replace("```json", "").replace("```", "").strip()
+    return json.loads(clean_text)
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
