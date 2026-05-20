@@ -19,8 +19,8 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # URL ตัวเก่งของพี่ที่เปิดประตูเชื่อมต่อสำเร็จ
-    url = f"https://generativelanguage.googleapis.com/v1beta/gemini-1.5-flash:generateContent?key={api_key}"
+    # 🌟 นี่คือ URL ตัวจริงเสียงจริง! ต้องมี v1beta/models/gemini-1.5-flash แบบยิงตรง
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     prompt = f"""
@@ -41,26 +41,30 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
         response = requests.post(url, headers=headers, json=payload, timeout=15)
         res_data = response.json()
         
-        # ── เติมส่วนแกะกล่องข้อมูลด้านล่างนี้เพื่อให้ระบบนำค่าไปใช้งานต่อได้ ──
+        # 1. ดักจับ Error ตรงจาก Google
         if "error" in res_data:
             st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
             return []
             
+        # 2. แกะเอาเนื้อหาข้อความออกมา
         if "candidates" in res_data and len(res_data["candidates"]) > 0:
             content = res_data["candidates"][0].get("content", {})
             parts = content.get("parts", [])
             if parts:
                 ai_response_text = parts[0].get("text", "")
                 
-                # คลีนตัวครอบ Markdown บล็อกออกเพื่อให้ระบบมองเห็น JSON บริสุทธิ์
+                # คลีนเศษ Markdown JSON ออก
                 clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
                 
-                # ส่งข้อมูล JSON กลับไปบันทึกลง Google Sheets และแสดงบนหน้าเว็บ
+                # แปลงร่างเป็น List/JSON ส่งกลับไปบันทึก
                 return json.loads(clean_text)
                 
         return []
     except Exception as e:
+        # หากแปลง JSON ไม่ผ่าน ให้โชว์ Raw ข้อมูลว่า Google ส่งอะไรกลับมากันแน่เพื่อกันบั๊ก
         st.error(f"⚠️ AI เกิดข้อผิดพลาดในการแกะข้อมูล: {e}")
+        if 'res_data' in locals():
+            st.write("ข้อมูลดิบจากกูเกิล:", res_data)
         return []
         
 # ══════════════════════════════════════════════════
