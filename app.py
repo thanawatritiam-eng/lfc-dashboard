@@ -20,7 +20,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     api_key = st.secrets["gemini_api_key"]["token"]
     
     # 🌟 URL ตัวเก่ง ยิงตรงเข้าโมเดล Flash เท่านั้น
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     prompt = f"""
