@@ -1014,7 +1014,7 @@ if timeline_data:
             # 2. บันทึกลง Sheet2
             save_timeline_to_sheet2(f"{current_home_name} vs {current_away_name}", timeline_data)
             st.success("✨ วิเคราะห์สำเร็จและบันทึกลง Sheet2 เรียบร้อยแล้ว!")
-        else:
+else:
             st.error("ไม่สามารถดึงข้อมูลได้")
 # ══════════════════════════════════════════════════
 # FOOTER
