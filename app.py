@@ -993,8 +993,8 @@ with col_side:
 
     # 3. นำโค้ด with tab_timeline มาวางไว้ใต้ st.tabs
     with tab_timeline:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
     
     # ปุ่มสั่งงาน AI โดยใช้ค่าตัวแปรจาก Dropdown ปัจจุบัน
     if st.button(f"🤖 วิเคราะห์ {current_home_name} vs {current_away_name} ด้วย AI"):
