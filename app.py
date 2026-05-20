@@ -23,6 +23,27 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════════
+# INITIALIZE DATA (วางไว้ใต้ส่วน Import)
+# ══════════════════════════════════════════════════
+
+# 1. โหลดข้อมูล JSON หลังบ้าน (ต้องเรียกก่อนเริ่มใช้ตัวแปร md)
+md = load_match_data() 
+
+# 2. ดึงข้อมูล API ทั้งฤดูกาลไว้ใช้งานทั่วทั้งแอป
+all_fixtures = fetch_all_fixtures_data()
+
+# 3. กำหนดค่าเริ่มต้นให้กับตัวแปรแมตช์ เพื่อป้องกัน NameError ทุกกรณี
+current_home_name = md["meta"].get("home_team", "Liverpool")
+current_away_name = md["meta"].get("away_team", "Unknown")
+current_m_status = "FINISHED"
+current_m_date = md["meta"].get("date", "-")
+current_sub_title = f"{md['meta'].get('competition', 'PL')} — นัดที่ {md['meta'].get('matchweek', 1)}"
+current_venue_info = f"🏟️ สนาม: {md['meta'].get('venue', '-')}"
+current_h_score = md["meta"].get("home_score", 0)
+current_a_score = md["meta"].get("away_score", 0)
+match_num = md["meta"].get("matchweek", 1)
+
+# ══════════════════════════════════════════════════
 # CONSTANTS (ปรับปรุงสำหรับ Football-Data.org)
 # ══════════════════════════════════════════════════
 LIVERPOOL_ID  = 64            # ไอดีของลิเวอร์พูลในค่ายใหม่
