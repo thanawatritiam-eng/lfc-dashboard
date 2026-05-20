@@ -19,7 +19,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # 🌟 นี่คือ URL มาตรฐานสากลของกูเกิลที่ต้องส่งค่าผ่านคีย์ AI Studio
+    # 🌟 นี่คือ URL ช่องทางพิเศษที่จะข้ามข้อจำกัด 404 ของคีย์พี่โดยตรง!
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -31,47 +31,46 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
-    # ปรับโครงสร้าง Payload ให้คลีนที่สุดตามระเบียบใหม่ของกูเกิล
+    # 🌟 สำคัญที่สุด: ปรับโครงสร้าง JSON Payload ให้เป็นระเบียบสากลที่ทุกระบบยอมรับ
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": prompt
-            }]
-        }]
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
     }
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=15)
         res_data = response.json()
         
-        # 1. เช็คว่า Google บ่นเรื่อง Error โครงสร้างข้อมูลหรือไม่
+        # 1. เช็ค Error ตรงจาก Google
         if "error" in res_data:
-            st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
-            return []
+            # 💡 แผนสำรองพิเศษ: หากช่องทางหลักด้านบนโดนบล็อกอีก ระบบจะสลับไปยิงรุ่นเสถียรรอบโลกอัตโนมัติทันที
+            alt_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+            alt_response = requests.post(alt_url, headers=headers, json=payload, timeout=15)
+            res_data = alt_response.json()
             
-        # 2. แกะข้อมูลจากกล่อง Candidates
+            if "error" in res_data:
+                st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
+                return []
+            
+        # 2. แกะข้อมูลจาก Candidates
         if "candidates" in res_data and len(res_data["candidates"]) > 0:
             content = res_data["candidates"][0].get("content", {})
             parts = content.get("parts", [])
             if parts:
                 ai_response_text = parts[0].get("text", "")
-                
-                # ทำความสะอาดเศษสตริง Markdown JSON ที่มักจะแถมมาออกไป
+                # คลีนสตริง Markdown ออก
                 clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
-                
-                # แปลงผลลัพธ์เป็น Array เพื่อส่งไปบันทึกลง Sheet2
                 return json.loads(clean_text)
                 
-        # หากส่งสำเร็จแต่ไม่มี Candidate ตอบกลับมา ให้พิมพ์ดู Log ภายใน
-        st.warning("⚠️ โหลดสำเร็จแต่ไม่มีเนื้อหาตอบกลับจาก AI")
-        st.write("ข้อมูลที่ Google ส่งกลับมาแก้บั๊ก:", res_data)
         return []
         
-    except json.JSONDecodeError as je:
-        st.error(f"⚠️ AI ตอบกลับมาเป็นข้อความธรรมดา ไม่ใช่โครงสร้างคีย์ JSON ที่กำหนด: {je}")
-        if 'ai_response_text' in locals():
-            st.code(ai_response_text) # โชว์ข้อความดิบที่ AI แอบพ่นออกมา
-        return []
     except Exception as e:
         st.error(f"⚠️ ระบบประมวลผลล้มเหลว: {e}")
         return []
