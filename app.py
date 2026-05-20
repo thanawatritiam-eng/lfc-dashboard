@@ -363,11 +363,9 @@ def fetch_comments() -> list:
 # LOCAL DATA ENGINE — Phase 2
 # ══════════════════════════════════════════════════
 def load_match_data() -> dict:
-    p = pathlib.Path("match_data.json")
-    if p.exists():
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {
+    """โหลดข้อมูลไฟล์ JSON พร้อมระบบ Safe Guard ป้องกันไฟล์พังล่ม 100%"""
+    # โครงสร้างสำรองเผื่อไฟล์พัง หน้าเว็บจะยังเปิดขึ้นมาได้ปลอดภัย
+    default_data = {
         "meta": {
             "home_team": "Liverpool", "away_team": "Chelsea",
             "home_score": 0, "away_score": 0,
@@ -381,8 +379,20 @@ def load_match_data() -> dict:
         "analysis": {"title": "", "body": "", "quote": ""},
         "rival_compare": []
     }
-
-md = load_match_data()
+    
+    p = pathlib.Path("match_data.json")
+    if p.exists():
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            # 🔥 ถ้าไฟล์ JSON พัง พิมพ์ syntax ผิด หรือไฟล์ว่างเปล่า ให้พ่น Warning และดึงค่า default ทันที
+            st.warning("⚠️ พบข้อผิดพลาดในไฟล์ match_data.json (ฟอร์แมตไม่ถูกต้อง) ระบบเปิดใช้งานโครงสร้างสำรองชั่วคราวให้แล้วครับ เพื่อป้องกันแอปพัง")
+            return default_data
+        except Exception as e:
+            st.warning(f"⚠️ เกิดข้อผิดพลาดอื่นในการโหลด JSON: {e}")
+            return default_data
+    return default_data
 
 import google.generativeai as genai
 
