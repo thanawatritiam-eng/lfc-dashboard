@@ -515,12 +515,13 @@ with col_main:
         
         match_title_key = f"{current_home_name} vs {current_away_name}"
         
-        # 1. ปุ่มสั่ง AI วิเคราะห์
+        # 1. ปุ่มสั่ง AI วิเคราะห์ (ล้างลอจิกเก่าที่พังออกหมดแล้ว)
         if m_status != "FINISHED":
             st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะเปิดให้ AI วิเคราะห์เหตุการณ์ได้หลังจบเกมครับ")
         else:
             if st.button(f"🤖 สั่ง AI วิเคราะห์ไทม์ไลน์คู่ {match_title_key}", use_container_width=True):
                 with st.spinner("Gemini กำลังเจาะลึกแมตช์และบันทึกลงฐานข้อมูล Sheet2..."):
+                    # 🌟 เรียกใช้ฟังก์ชันตัวใหม่ล่าสุด ไม่วิ่งไปหาฟังก์ชันโบราณข้างล่างแล้ว
                     ai_timeline = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
                     if ai_timeline:
                         save_timeline_to_sheet2(match_title_key, ai_timeline)
@@ -529,7 +530,7 @@ with col_main:
             
             st.markdown("---")
             
-            # 2. ดึงข้อมูลไทม์ไลน์มาแสดงผล (ย่อหน้าตรงนี้ขยับตรงระนาบอย่างถูกต้องแล้ว)
+            # 2. ดึงข้อมูลไทม์ไลน์มาแสดงผล (ย่อหน้าตรงเป๊ะ ไม่ขึ้น IndentationError แน่นอน)
             db_timeline = fetch_timeline_from_sheet2(match_title_key)
             is_json_match = (md["meta"]["away_team"].lower() in current_away_name.lower()) or (md["meta"]["home_team"].lower() in current_home_name.lower())
             
