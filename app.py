@@ -23,27 +23,6 @@ st.set_page_config(
 )
 
 # ══════════════════════════════════════════════════
-# INITIALIZE DATA (วางไว้ใต้ส่วน Import)
-# ══════════════════════════════════════════════════
-
-# 1. โหลดข้อมูล JSON หลังบ้าน (ต้องเรียกก่อนเริ่มใช้ตัวแปร md)
-md = load_match_data() 
-
-# 2. ดึงข้อมูล API ทั้งฤดูกาลไว้ใช้งานทั่วทั้งแอป
-all_fixtures = fetch_all_fixtures_data()
-
-# 3. กำหนดค่าเริ่มต้นให้กับตัวแปรแมตช์ เพื่อป้องกัน NameError ทุกกรณี
-current_home_name = md["meta"].get("home_team", "Liverpool")
-current_away_name = md["meta"].get("away_team", "Unknown")
-current_m_status = "FINISHED"
-current_m_date = md["meta"].get("date", "-")
-current_sub_title = f"{md['meta'].get('competition', 'PL')} — นัดที่ {md['meta'].get('matchweek', 1)}"
-current_venue_info = f"🏟️ สนาม: {md['meta'].get('venue', '-')}"
-current_h_score = md["meta"].get("home_score", 0)
-current_a_score = md["meta"].get("away_score", 0)
-match_num = md["meta"].get("matchweek", 1)
-
-# ══════════════════════════════════════════════════
 # CONSTANTS (ปรับปรุงสำหรับ Football-Data.org)
 # ══════════════════════════════════════════════════
 LIVERPOOL_ID  = 64            # ไอดีของลิเวอร์พูลในค่ายใหม่
@@ -541,82 +520,98 @@ st.markdown(
 )
 
 # ══════════════════════════════════════════════════
-# MAIN LAYOUT (โครงสร้างตัวแปรหลักแบบ Global สำหรับทุกแท็บ)
+# MAIN LAYOUT
 # ══════════════════════════════════════════════════
-
-# 1. 📋 เตรียมข้อมูลและสถานะแมตช์ปัจจุบันให้พร้อมใช้งานในทุกส่วนของแอป
-all_fixtures = fetch_all_fixtures_data()
-
-current_home_name = md["meta"]["home_team"]
-current_away_name = md["meta"]["away_team"]
-current_m_status = "FINISHED"
-current_m_date = md["meta"]["date"]
-current_sub_title = f"{md['meta']['competition']} — นัดที่ {md['meta']['matchweek']}"
-current_venue_info = f"🏟️ สนาม: {md['meta']['venue']}"
-current_h_score = md["meta"]["home_score"]
-current_a_score = md["meta"]["away_score"]
-match_num = md["meta"]["matchweek"]
-
-# 2. 📅 ถ้าดึง API ได้สำเร็จ ให้สร้างกล่องตัวเลือกเพื่ออัปเดตข้อมูลตัวแปรด้านบน
-if all_fixtures:
-    all_fixtures.sort(key=lambda x: x.get("utcDate", ""))
-    fixture_options = []
-    for index, fx in enumerate(all_fixtures):
-        home_t = fx["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        away_t = fx["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        status = " (จบเกมแล้ว)" if fx.get("status") == "FINISHED" else " (ยังไม่แข่ง)"
-        option_text = f"นัดที่ {index + 1}: {home_t} vs {away_t}{status}"
-        fixture_options.append((option_text, fx, index + 1))
-        
-    selected_option = st.selectbox(
-        "📅 เลือกแมตช์ที่ต้องการดูข้อมูลในฤดูกาลนี้ :",
-        options=fixture_options,
-        format_func=lambda x: x[0],
-        index=7  # เริ่มต้นที่นัดที่ 8 (Liverpool vs Chelsea)
-    )
-    
-    if selected_option:
-        _, current_match_obj, match_num = selected_option
-        current_home_name = current_match_obj["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        current_away_name = current_match_obj["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
-        current_m_status = current_match_obj.get("status", "")
-        current_m_date = fmt_date(current_match_obj.get("utcDate", ""))
-        current_venue_info = f"🏟️ แข่งที่สนามของสโมสร {current_home_name} (บ้านของ {current_home_name})"
-        
-        comp_name = current_match_obj.get("competition", {}).get("name", "Premier League")
-        if current_m_status == "FINISHED":
-            current_h_score = current_match_obj["score"]["fullTime"]["home"]
-            current_a_score = current_match_obj["score"]["fullTime"]["away"]
-            current_sub_title = f"{comp_name} — นัดที่ {match_num} (แข่งขันเสร็จสิ้น)"
-        else:
-            current_h_score = "-"
-            current_a_score = "-"
-            current_sub_title = f"⏳ {comp_name} — โปรแกรมนัดที่ {match_num} (ยังไม่ได้แข่งขัน)"
-
-# 3. 🏁 เริ่มแบ่งคอลัมน์การแสดงผล
 col_main, col_side = st.columns([2, 1])
 
 with col_main:
-    # ── BANNER MATCHWEEK & SCORE (Dynamic ดึงตามค่าตัวแปรสากลด้านบน) ──
-    h_color = "#C8102E" if "Liverpool" in current_home_name else "#94a3b8"
-    a_color = "#C8102E" if "Liverpool" in current_away_name else "#94a3b8"
+    # ── BANNER MATCHWEEK & SCORE (ปรับปรุงดึงแมตช์ทั้งฤดูกาล + ระบุบ้านใครอัตโนมัติ) ──
+    all_fixtures = fetch_all_fixtures_data()
     
-    st.markdown(
-        f'<div class="score-banner">'
-        f'  <div class="score-team" style="color:{h_color}; text-align:right;">{current_home_name}</div>'
-        f'  <div>'
-        f'    <div class="score-vs">{current_sub_title}</div>'
-        f'    <div style="display:flex; align-items:center; justify-content:center;">'
-        f'      <span class="score-number">{current_h_score}</span>'
-        f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
-        f'      <span class="score-number">{current_a_score}</span>'
-        f'    </div>'
-        f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">⏰ เวลาเตะ: {current_m_date} | {current_venue_info}</div>'
-        f'  </div>'
-        f'  <div class="score-team" style="color:{a_color}; text-align:left;">{current_away_name}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    if all_fixtures:
+        # เรียงจากนัดแรกต้นฤดูกาล ไปจนถึงนัดสุดท้ายของปี
+        all_fixtures.sort(key=lambda x: x.get("utcDate", ""))
+        
+        # สร้างตัวเลือกในกล่อง Dropdown
+        fixture_options = []
+        for index, fx in enumerate(all_fixtures):
+            home_t = fx["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
+            away_t = fx["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
+            status = " (จบเกมแล้ว)" if fx.get("status") == "FINISHED" else " (ยังไม่แข่ง)"
+            
+            # เช่น "นัดที่ 8: Liverpool vs Chelsea (จบเกมแล้ว)"
+            option_text = f"นัดที่ {index + 1}: {home_t} vs {away_t}{status}"
+            fixture_options.append((option_text, fx, index + 1))
+            
+        # สร้างกล่องคอมโบสำหรับการเลือกแมตช์บนหน้าเว็บ
+        selected_option = st.selectbox(
+            "📅 เลือกแมตช์ที่ต้องการดูข้อมูลในฤดูกาลนี้ :",
+            options=fixture_options,
+            format_func=lambda x: x[0],
+            index=7  # ตั้งค่าเป็นเลข 7 เพื่อให้เปิดหน้าเว็บมาแล้วล็อกอยู่ที่ นัดที่ 8 (Liverpool vs Chelsea) เสมอตามคอนเทนต์ในใจกลางเพจของคุณ
+        )
+        
+        # ดึงข้อมูลแมตช์ที่แฟนบอลเลือก
+        _, current_match, match_num = selected_option
+        
+        h_name = current_match["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
+        a_name = current_match["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
+        comp_name = current_match.get("competition", {}).get("name", "Premier League")
+        m_status = current_match.get("status", "")
+        m_date = fmt_date(current_match.get("utcDate", ""))
+        
+        # 🏟️ ระบบตรวจสอบสนามเตะและบอกว่าบ้านใครโดยอัตโนมัติ
+        venue_info = f"🏟️ แข่งที่สนามของสโมสร {h_name} (บ้านของ {h_name})"
+        
+        # จัดการสีสันของตัวอักษรทีมลิเวอร์พูลให้เด่นด้วยสีแดง
+        h_color = "#C8102E" if "Liverpool" in h_name else "#94a3b8"
+        a_color = "#C8102E" if "Liverpool" in a_name else "#94a3b8"
+        
+        # ตรวจสอบว่าแมตช์แข่งเสร็จหรือยัง เพื่อแยกแสดงคะแนนกับเวลาเตะ
+        if m_status == "FINISHED":
+            h_score = current_match["score"]["fullTime"]["home"]
+            a_score = current_match["score"]["fullTime"]["away"]
+            sub_title_text = f"{comp_name} — นัดที่ {match_num} (แข่งขันเสร็จสิ้น)"
+        else:
+            h_score = "-"
+            a_score = "-"
+            sub_title_text = f"⏳ {comp_name} — โปรแกรมนัดที่ {match_num} (ยังไม่ได้แข่งขัน)"
+            
+        st.markdown(
+            f'<div class="score-banner">'
+            f'  <div class="score-team" style="color:{h_color}; text-align:right;">{h_name}</div>'
+            f'  <div>'
+            f'    <div class="score-vs">{sub_title_text}</div>'
+            f'    <div style="display:flex; align-items:center; justify-content:center;">'
+            f'      <span class="score-number">{h_score}</span>'
+            f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
+            f'      <span class="score-number">{a_score}</span>'
+            f'    </div>'
+            f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">⏰ เวลาเตะ: {m_date} | {venue_info}</div>'
+            f'  </div>'
+            f'  <div class="score-team" style="color:{a_color}; text-align:left;">{a_name}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # กรณี API ขัดข้อง ดึงข้อมูลสำรองจากไฟล์ json มาโชว์เพื่อไม่ให้หน้าเว็บระเบิด
+        m = md["meta"]
+        st.markdown(
+            f'<div class="score-banner">'
+            f'  <div class="score-team" style="color:{m["home_color"]}; text-align:right;">{m["home_team"]}</div>'
+            f'  <div>'
+            f'    <div class="score-vs">{m["competition"]} — นัดที่ {m["matchweek"]}</div>'
+            f'    <div style="display:flex; align-items:center; justify-content:center;">'
+            f'      <span class="score-number">{m["home_score"]}</span>'
+            f'      <span style="color:#475569; font-size:1.5rem; font-weight:700;">-</span>'
+            f'      <span class="score-number">{m["away_score"]}</span>'
+            f'    </div>'
+            f'    <div style="color:#64748b; font-size:0.85rem; margin-top:0.5rem;">🏟️ {m["venue"]} | 📅 {m["date"]}</div>'
+            f'  </div>'
+            f'  <div class="score-team" style="color:{m["away_color"]}; text-align:left;">{m["away_team"]}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── TAB MENU ──
     tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
@@ -627,13 +622,15 @@ with col_main:
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
         
-        # ⚽ ตรวจสอบความสอดคล้องกับไฟล์ JSON (แก้ปัญหา NameError ชัวร์ 100%)
-        is_json_match = (md["meta"]["away_team"].lower() in current_away_name.lower()) or \
-                        (md["meta"]["home_team"].lower() in current_home_name.lower())
+        # 💡 เช็กว่าแมตช์ที่เลือกใน Dropdown ด้านบน ตรงกับทีมที่เราเขียนคอนเทนต์ไว้ใน match_data.json หรือไม่
+        # (ตรวจสอบจากคำว่า Chelsea หรือชื่อทีมเยือน/เหย้าเพื่อให้แมตช์กัน)
+        is_json_match = (md["meta"]["away_team"].lower() in a_name.lower()) or (md["meta"]["home_team"].lower() in h_name.lower())
         
-        if current_m_status != "FINISHED":
+        if m_status != "FINISHED":
+            # กรณีเลือกแมตช์ที่ยังไม่ได้แข่งขัน
             st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะอัปเดตเหตุการณ์สำคัญ (ประตู, ใบเหลือง-แดง, เปลี่ยนตัว) ทันทีหลังจบเกมครับ")
         elif is_json_match and md.get("timeline"):
+            # กรณีเลือกแมตช์ที่แข่งขันจบแล้ว และตรงกับแมตช์ที่เราวิเคราะห์ไว้ใน JSON (นัด Chelsea)
             for item in md["timeline"]:
                 st.markdown(
                     f'<div class="timeline-item">'
@@ -646,6 +643,7 @@ with col_main:
                     unsafe_allow_html=True,
                 )
         else:
+            # กรณีเลือกแมตช์อื่น ๆ ที่แข่งจบแล้ว แต่เรายังไม่ได้เขียนเหตุการณ์ลงในไฟล์ JSON
             st.warning("📊 แมตช์นี้แข่งจบแล้ว แต่อยู่ระหว่างรอแอดมินอัปเดตข้อมูลเหตุการณ์เชิงลึก (ประตู/เปลี่ยนตัว) ลงในระบบหลังบ้านครับ")
             
         st.markdown('</div>', unsafe_allow_html=True)
