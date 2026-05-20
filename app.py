@@ -11,7 +11,23 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+import google.generativeai as genai # 1. อย่าลืมเพิ่ม Import นี้ที่ด้านบนด้วยนะครับ
 
+
+
+# 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
+def get_match_timeline_from_gemini(home_team, away_team, date):
+    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    prompt = f"""
+    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
+    ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
+    ตอบเป็น JSON ตามโครงสร้างนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    """
+    
+    response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+    return json.loads(response.text)
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
