@@ -29,28 +29,19 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
     
     # 1. เปลี่ยนมาใช้โมเดล gemini-1.0-pro ซึ่งรองรับในทุกบัญชีและเสถียรมาก
-    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
+   def get_match_timeline_from_gemini(home_team, away_team, date):
+    # ลบการคอนฟิกที่ซับซ้อนออก ให้เหลือแค่ API Key
+    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
     
-    prompt = f"""
-    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
-    ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
-    ขอในรูปแบบ JSON เท่านั้น ตามโครงสร้างนี้: 
-    [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
-    ห้ามมีข้อความอื่นนอกจาก JSON
-    """
+    # ใช้รุ่นล่าสุดที่รองรับทั่วโลก
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # 2. เอา generation_config ออกไปก่อน เพื่อป้องกัน Error เรื่อง Version ไม่รองรับ
+    prompt = f"วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} (ขอผลเป็น JSON เท่านั้นไม่มีข้อความอื่น)"
+    
+    # ตัด generation_config ออกไปเลย
     response = model.generate_content(prompt)
     
-    # 3. ใช้ .strip() และลบ Markdown ออก เพื่อให้แน่ใจว่าเป็น JSON ที่สะอาด
-    clean_text = response.text.replace("```json", "").replace("```", "").strip()
-    
-    try:
-        return json.loads(clean_text)
-    except json.JSONDecodeError:
-        # ถ้า AI ส่งอะไรที่ผิดพลาดมา ให้ส่งคืนเป็น List ว่าง
-        st.error("AI ตอบกลับมาไม่ใช่รูปแบบ JSON ที่ถูกต้อง")
-        return []
+    return json.loads(response.text.replace("```json", "").replace("```", "").strip())
 
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
