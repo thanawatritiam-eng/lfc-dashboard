@@ -624,7 +624,16 @@ with col_main:
         
         # 💡 เช็กว่าแมตช์ที่เลือกใน Dropdown ด้านบน ตรงกับทีมที่เราเขียนคอนเทนต์ไว้ใน match_data.json หรือไม่
         # (ตรวจสอบจากคำว่า Chelsea หรือชื่อทีมเยือน/เหย้าเพื่อให้แมตช์กัน)
-        is_json_match = (md["meta"]["away_team"].lower() in a_name.lower()) or (md["meta"]["home_team"].lower() in h_name.lower())
+        # เปลี่ยนบรรทัด 627 เป็นแบบปลอดภัยนี้:
+# ดึงชื่อทีมจาก JSON เป็นค่าพื้นฐานเสมอ ป้องกัน NameError
+meta_home = md["meta"].get("home_team", "").lower()
+meta_away = md["meta"].get("away_team", "").lower()
+
+# ใช้ตัวแปร current_home_name/current_away_name ถ้ามีอยู่ (จาก logic ด้านบน) หรือใช้จาก JSON
+curr_h = locals().get("current_home_name", meta_home).lower()
+curr_a = locals().get("current_away_name", meta_away).lower()
+
+is_json_match = (meta_away in curr_a) or (meta_home in curr_h)
         
         if m_status != "FINISHED":
             # กรณีเลือกแมตช์ที่ยังไม่ได้แข่งขัน
