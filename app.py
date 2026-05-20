@@ -15,10 +15,11 @@ import google.generativeai as genai # 1. อย่าลืมเพิ่ม Im
 
 
 
-# 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
 def get_match_timeline_from_gemini(home_team, away_team, date):
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # เปลี่ยนชื่อโมเดลเป็นตัวนี้ครับ
+    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
     
     prompt = f"""
     วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
@@ -26,8 +27,13 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     ตอบเป็น JSON ตามโครงสร้างนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
     """
     
-    response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
-    return json.loads(response.text)
+    # ลองเอา response_mime_type ออกก่อนถ้ายังติด error 404
+    # เพราะบาง API Version อาจจะยังไม่ support โหมด JSON อัตโนมัติ
+    response = model.generate_content(prompt)
+    
+    # ถ้าเอา response_mime_type ออก ต้องทำการล้างข้อความเองแบบนี้
+    clean_text = response.text.replace("```json", "").replace("```", "")
+    return json.loads(clean_text)
 
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
