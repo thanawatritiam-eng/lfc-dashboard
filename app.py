@@ -179,12 +179,14 @@ def fetch_live_fixture() -> dict | None:
     all_fix = fetch_all_fixtures_data()
     if not all_fix:
         return None
-    # ค่ายใหม่ใช้สถานะ "IN_PLAY" หรือ "PAUSED" ตอนเตะอยู่
     live_matches = [f for f in all_fix if f.get("status") in ["IN_PLAY", "PAUSED"]]
     if live_matches:
         lm = live_matches[0]
         return {
-            "fixture": {"status": {"short": "LIVE"}},
+            "fixture": {
+                "status": {"short": "LIVE"},
+                "venue": {"name": "Anfield"}  # 👈 ใส่เผื่อไว้กันเหนียวเหมือนกันครับ
+            },
             "teams": {
                 "home": {"name": lm["homeTeam"]["name"]},
                 "away": {"name": lm["awayTeam"]["name"]}
