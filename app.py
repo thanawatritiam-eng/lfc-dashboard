@@ -40,7 +40,8 @@ COMPETITIONS = {
 
 # ══════════════════════════════════════════════════
 # API-FOOTBALL LAYER  ← Phase 4 (RapidAPI Edition)
-# ══════════════════════════════════════════════════def _api_headers() -> dict:
+# ══════════════════════════════════════════════════
+def _api_headers() -> dict:
     return {
         "X-Auth-Token": st.secrets["football_data"]["token"],
         "Content-Type": "application/json"
