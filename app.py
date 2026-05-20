@@ -563,8 +563,17 @@ with col_main:
 
     with tab_timeline:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
-        if md["timeline"]:
+        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        
+        # 💡 เช็กว่าแมตช์ที่เลือกใน Dropdown ด้านบน ตรงกับทีมที่เราเขียนคอนเทนต์ไว้ใน match_data.json หรือไม่
+        # (ตรวจสอบจากคำว่า Chelsea หรือชื่อทีมเยือน/เหย้าเพื่อให้แมตช์กัน)
+        is_json_match = (md["meta"]["away_team"].lower() in a_name.lower()) or (md["meta"]["home_team"].lower() in h_name.lower())
+        
+        if m_status != "FINISHED":
+            # กรณีเลือกแมตช์ที่ยังไม่ได้แข่งขัน
+            st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะอัปเดตเหตุการณ์สำคัญ (ประตู, ใบเหลือง-แดง, เปลี่ยนตัว) ทันทีหลังจบเกมครับ")
+        elif is_json_match and md.get("timeline"):
+            # กรณีเลือกแมตช์ที่แข่งขันจบแล้ว และตรงกับแมตช์ที่เราวิเคราะห์ไว้ใน JSON (นัด Chelsea)
             for item in md["timeline"]:
                 st.markdown(
                     f'<div class="timeline-item">'
@@ -577,7 +586,9 @@ with col_main:
                     unsafe_allow_html=True,
                 )
         else:
-            st.info("ไม่มีข้อมูลไทม์ไลน์ในแมตช์นี้")
+            # กรณีเลือกแมตช์อื่น ๆ ที่แข่งจบแล้ว แต่เรายังไม่ได้เขียนเหตุการณ์ลงในไฟล์ JSON
+            st.warning("📊 แมตช์นี้แข่งจบแล้ว แต่อยู่ระหว่างรอแอดมินอัปเดตข้อมูลเหตุการณ์เชิงลึก (ประตู/เปลี่ยนตัว) ลงในระบบหลังบ้านครับ")
+            
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab_analysis:
