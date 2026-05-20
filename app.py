@@ -157,19 +157,29 @@ def fetch_next_fixture() -> dict | None:
     all_fix = fetch_all_fixtures_data()
     if not all_fix:
         return None
-    # ค่ายใหม่ใช้สถานะ "TIMED" หรือ "SCHEDULED" สำหรับแมตช์ในอนาค
+    # ค่ายใหม่ใช้สถานะ "TIMED" หรือ "SCHEDULED" สำหรับแมตช์ในอนาคต
     upcoming = [f for f in all_fix if f.get("status") in ["TIMED", "SCHEDULED"]]
     if upcoming:
         upcoming.sort(key=lambda f: f.get("utcDate", ""))
         nxt = upcoming[0]
+        
+        # ค้นหาชื่อลีกจากข้อมูลที่ส่งมา (ค่ายนี้มักให้มาในก้อน competition)
+        comp_name = nxt.get("competition", {}).get("name", "Premier League")
+        comp_code = nxt.get("competition", {}).get("code", "PL")
+        
         return {
             "fixture": {
                 "date": nxt.get("utcDate"), 
-                "venue": {"name": "Anfield"}  # 👈 แก้ตรงนี้! ครอบดิคชันนารีเพิ่ม เพื่อให้บรรทัด 604 ใช้ .get("name") ได้โดยไม่พัง
+                "venue": {"name": "Anfield"}
             }, 
             "teams": {
                 "home": {"name": nxt["homeTeam"]["name"]},
                 "away": {"name": nxt["awayTeam"]["name"]}
+            },
+            # 💡 เพิ่มบล็อกนี้เข้าไป! จำลองหน้าตา league ให้เหมือนค่ายเก่าเพื่อหลอกบรรทัด 610 ไม่ให้เอเรอร์
+            "league": {
+                "id": comp_code,     # ส่งตัวย่อ เช่น 'PL' ไปให้ COMPETITIONS.get() ทำงานได้
+                "name": comp_name
             }
         }
     return None
@@ -182,16 +192,23 @@ def fetch_live_fixture() -> dict | None:
     live_matches = [f for f in all_fix if f.get("status") in ["IN_PLAY", "PAUSED"]]
     if live_matches:
         lm = live_matches[0]
+        comp_name = lm.get("competition", {}).get("name", "Premier League")
+        comp_code = lm.get("competition", {}).get("code", "PL")
         return {
             "fixture": {
                 "status": {"short": "LIVE"},
-                "venue": {"name": "Anfield"}  # 👈 ใส่เผื่อไว้กันเหนียวเหมือนกันครับ
+                "venue": {"name": "Anfield"}
             },
             "teams": {
                 "home": {"name": lm["homeTeam"]["name"]},
                 "away": {"name": lm["awayTeam"]["name"]}
             },
-            "goals": {"home": lm["score"]["fullTime"]["home"], "away": lm["score"]["fullTime"]["away"]}
+            "goals": {"home": lm["score"]["fullTime"]["home"], "away": lm["score"]["fullTime"]["away"]},
+            # 💡 ใส่เผื่อไว้เหมือนกันครับ
+            "league": {
+                "id": comp_code,
+                "name": comp_name
+            }
         }
     return None
 
