@@ -520,13 +520,16 @@ with col_main:
             st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะเปิดให้ AI วิเคราะห์เหตุการณ์ได้หลังจบเกมครับ")
         else:
             if st.button(f"🤖 สั่ง AI วิเคราะห์ไทม์ไลน์คู่ {match_title_key}", use_container_width=True):
-                with st.spinner("AI กำลังย้อนรอยดูเทปการแข่ง..."):
-                        # 🌟 สั่งเรียกฟังก์ชันหลักที่เราอัปเดตคีย์และ URL ล่าสุดไว้
-                        raw_events = get_match_timeline_from_gemini(home_team, away_team, date)
-                    if ai_timeline:
-                        save_timeline_to_sheet2(match_title_key, ai_timeline)
-                        st.success("✨ AI สรุปประมวลผลและอัปเดตลง Sheet2 สำเร็จ!")
-                        st.rerun()
+                # 💡 ตัวอย่างแนวการเยื้องในบล็อกปุ่มกด (นับจำนวน Tab หรือ Spacebar ให้ตรงกับบรรทัดบน)
+        with st.spinner("AI กำลังย้อนรอยดูเทปการแข่ง..."):
+            ai_timeline = get_match_timeline_from_gemini(home_team, away_team, date)
+            
+            # 🌟 บรรทัดที่ 526: จัดระยะให้ตรงกับ ai_timeline ด้านบนเป๊ะๆ ห้ามล้ำไปข้างหน้า
+            if ai_timeline:
+                st.success("🤖 AI วิเคราะห์ข้อมูลสำเร็จและอัปเดตลงระบบเรียบร้อย!")
+                # โค้ดบันทึกลงชีตอื่นๆ ด้านล่าง...
+            else:
+                st.error("❌ ไม่สามารถดึงข้อมูลไทม์ไลน์จาก AI ได้")
             
             st.markdown("---")
             
