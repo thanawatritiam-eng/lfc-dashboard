@@ -989,9 +989,28 @@ with col_side:
 if st.button("🤖 วิเคราะห์แมตช์ด้วย Gemini & บันทึกเข้า Sheet2"):
     with st.spinner("Gemini กำลังอ่านข้อมูล..."):
         # 1. ดึงข้อมูลจาก AI
-        timeline_data = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
+            timeline_data = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
+        # ══════════════════════════════════════════════════
+        # กำหนดค่าตัวแปรเริ่มต้นเพื่อป้องกัน NameError
+        # ══════════════════════════════════════════════════
+if 'current_home_name' not in locals():
+    current_home_name = "Liverpool"
+if 'current_away_name' not in locals():
+    current_away_name = "Unknown"
+if 'current_m_date' not in locals():
+    current_m_date = datetime.date.today().strftime("%Y-%m-%d")
+
+# ══════════════════════════════════════════════════
+# ตรวจสอบว่าถ้ามีการเลือกแมตช์จาก API ให้ดึงค่ามาใส่ตัวแปร
+# (ต้องวางไว้ใต้จุดที่คุณดึงข้อมูลจาก API แล้ว)
+# ══════════════════════════════════════════════════
+# ตรวจสอบชื่อตัวแปรที่เก็บค่าแมตช์ที่เลือกไว้ในโค้ดของคุณ (เช่น match_obj หรือ selected_match)
+# ถ้ามีตัวแปรนั้นอยู่แล้ว ให้เอามา assign ค่าแบบนี้:
+# current_home_name = match_obj['homeTeam']['name']
+# current_away_name = match_obj['awayTeam']['name']
+# current_m_date = match_obj['utcDate'].split('T')[0]
         
-        if timeline_data:
+if timeline_data:
             # 2. บันทึกลง Sheet2
             save_timeline_to_sheet2(f"{current_home_name} vs {current_away_name}", timeline_data)
             st.success("✨ วิเคราะห์สำเร็จและบันทึกลง Sheet2 เรียบร้อยแล้ว!")
