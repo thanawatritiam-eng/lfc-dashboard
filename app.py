@@ -226,7 +226,7 @@ def fetch_live_fixture() -> dict | None:
 
 # ── ฟังก์ชันดึงตารางคะแนน ──
 def fetch_standings() -> dict:
-    """ดึงตารางคะแนนพรีเมียร์ลีกจาก Football-Data.org"""
+    """ดึงตารางคะแนนพรีเมียร์ลีกจาก Football-Data.org (ปรับคีย์ให้ครบจบปัญหา KeyError ตารางคะแนน)"""
     def _fetch():
         out = {}
         data = _get("competitions/PL/standings")
@@ -237,14 +237,23 @@ def fetch_standings() -> dict:
             for item in raw_table:
                 formatted_table.append({
                     "rank": item["position"],
-                    "team": {"name": item["team"]["name"], "id": item["team"]["id"], "logo": ""},
+                    "team": {
+                        "name": item["team"]["name"], 
+                        "id": item["team"]["id"], 
+                        "logo": item["team"].get("crest", "")  # ใส่รูปโลโก้ของค่ายใหม่แถมไปด้วยครับ
+                    },
                     "points": item["points"],
+                    # 💡 ใส่เพิ่มตรงนี้! แก้ปัญหา KeyError: goalsDiff ที่บรรทัด 755 ถาวร
+                    "goalsDiff": item["goalDifference"],  
                     "all": {
                         "played": item["playedGames"],
                         "win": item["won"],
                         "draw": item["draw"],
                         "lose": item["lost"],
-                        "goals": {"for": item["goalsFor"], "against": item["goalsAgainst"]}
+                        "goals": {
+                            "for": item["goalsFor"], 
+                            "against": item["goalsAgainst"]
+                        }
                     }
                 })
             out["Premier League"] = formatted_table
