@@ -25,14 +25,14 @@ st.set_page_config(
 # ══════════════════════════════════════════════════
 # CONSTANTS
 # ══════════════════════════════════════════════════
-LIVERPOOL_ID  = 40
+LIVERPOOL_ID  = 64
 SEASON        = 2024          # ปรับได้ใน match_data.json
 CACHE_TTL_SEC = 3600          # 1 ชั่วโมง (ประหยัด quota)
 LIVE_TTL_SEC  = 300           # 5 นาที (วันแข่ง)
 
 # competition IDs ที่ Liverpool เล่น
 COMPETITIONS = {
-    39:  "Premier League",
+    PL:  "Premier League",
     2:   "Champions League",
     45:  "FA Cup",
     48:  "League Cup",
@@ -43,15 +43,15 @@ COMPETITIONS = {
 # ══════════════════════════════════════════════════
 def _api_headers() -> dict:
     return {
-        "x-rapidapi-key":  st.secrets["api_football"]["key"],
-        "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
+        "X-Auth-Token":  st.secrets["football_data.token"]["key"],
+        "x-rapidapi-host": "api.football-data.org/v4",
     }
 
 def _get(endpoint: str, params: dict) -> dict | None:
     """raw GET — จัดการ error ให้ครบ"""
     try:
         r = requests.get(
-            f"https://api-football-v1.p.rapidapi.com/v3/{endpoint}",
+            f"https://api.football-data.org/v4/{endpoint}",
             headers=_api_headers(),
             params=params,
             timeout=10,
@@ -202,11 +202,11 @@ SCOPES    = ["https://www.googleapis.com/auth/spreadsheets"]
 @st.cache_resource
 def get_sheets_service():
     creds = service_account.Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=SCOPES)
+        st.["gcp_service_account"], scopes=SCOPES)
     return build("sheets", "v4", credentials=creds).spreadsheets()
 
 def get_sheet_id() -> str:
-    return st.secrets["gsheets"]["spreadsheet_id"]
+    return st.["gsheets"]["spreadsheet_id"]
 
 def fetch_comments() -> list:
     try:
