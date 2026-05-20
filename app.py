@@ -29,24 +29,6 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
     return json.loads(response.text)
 
-with tab_timeline:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
-        
-        # เพิ่มปุ่มสำหรับสั่งให้ AI วิเคราะห์
-        if st.button("🤖 อัปเดตไทม์ไลน์อัตโนมัติด้วย AI"):
-            with st.spinner("Gemini กำลังอ่านข้อมูลแมตช์นี้..."):
-                try:
-                    # เรียกฟังก์ชัน AI
-                    ai_data = get_match_timeline_from_gemini(h_name, a_name, m_date)
-                    # บันทึกลง Sheet2 (ฟังก์ชันที่คุณเพิ่งเขียนไว้)
-                    save_timeline_to_sheet2(f"{h_name} vs {a_name}", ai_data)
-                    st.success("✨ บันทึกไทม์ไลน์ลง Sheet2 เรียบร้อยแล้ว!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-
-        # ... (โค้ดแสดงผลไทม์ไลน์เดิมของคุณ)
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
@@ -999,7 +981,30 @@ with col_side:
         st.markdown('<div class="comment-item" style="color:#94a3b8;text-align:center;">ยังไม่มีคอมเมนต์ เป็นคนแรกได้เลย! 👆</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+# 2. ในส่วนของ Main Layout หลังจาก st.selectbox เลือกแมตช์เสร็จแล้ว
+    # ── TAB MENU (ประกาศตรงนี้) ──
+    tab_timeline, tab_analysis, tab_stats, tab_standings = st.tabs([
+        "⏱️ ไทม์ไลน์สำคัญ", "🧐 วิเคราะห์แทคติก", "📊 สถิติทีม & นักเตะ", "🏆 ตารางคะแนน พรีเมียร์ลีก"
+    ])
 
+    # 3. นำโค้ด with tab_timeline มาวางไว้ใต้ st.tabs
+    with tab_timeline:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+        
+        # เพิ่มปุ่มวิเคราะห์ AI
+        if st.button("🤖 อัปเดตไทม์ไลน์อัตโนมัติด้วย AI"):
+            with st.spinner("Gemini กำลังวิเคราะห์..."):
+                try:
+                    ai_data = get_match_timeline_from_gemini(h_name, a_name, m_date)
+                    save_timeline_to_sheet2(f"{h_name} vs {a_name}", ai_data)
+                    st.success("✨ บันทึกไทม์ไลน์ลง Sheet2 เรียบร้อยแล้ว!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
+        
+        # ... (โค้ดแสดงไทม์ไลน์เดิมของคุณ)
+        st.markdown('</div>', unsafe_allow_html=True)
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
