@@ -745,23 +745,28 @@ with col_side:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title">👀 ซูมฟอร์มคู่แข่งทีมสำคัญ</div>', unsafe_allow_html=True)
     if md.get("rival_compare"):
-        # 💡 เปลี่ยนชื่อตัวแปรวนลูปเป็น rival เพื่อแก้ปัญหา TypeError ชนกับตัวแปรตารางคะแนน
         for rival in md["rival_compare"]:
+            # แกะชื่อทีมออกมาตรงๆ ตามโครงสร้างใน match_data.json
+            rival_name = rival.get("team", "Unknown Team")
+            rival_pts  = rival.get("points", 0)
+            rival_play = rival.get("played", 0)
+            rival_last = rival.get("last_match", "-")
+            rival_comm = rival.get("status_comment", "")
+            
             st.markdown(
                 f'<div style="margin-bottom:0.75rem; font-size:0.9rem; padding-bottom:0.5rem; border-bottom:1px solid #1e293b;">'
                 f'  <div style="display:flex; justify-content:space-between; font-weight:600; color:#e2e8f0;">'
-                f'    <span>{rival["team"]}</span>'
-                f'    <span style="color:#eab308;">{rival["points"]} แต้ม (นัดที่ {rival["played"]})</span>'
+                f'    <span>{rival_name}</span>'
+                f'    <span style="color:#eab308;">{rival_pts} แต้ม (นัดที่ {rival_play})</span>'
                 f'  </div>'
-                f'  <div style="font-size:0.8rem; color:#64748b; margin-top:0.15rem;">📌 นัดล่าสุด: {rival["last_match"]}</div>'
-                f'  <div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">{rival["status_comment"]}</div>'
+                f'  <div style="font-size:0.8rem; color:#64748b; margin-top:0.15rem;">📌 นัดล่าสุด: {rival_last}</div>'
+                f'  <div style="font-size:0.85rem; color:#94a3b8; font-style:italic;">{rival_comm}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
     else:
         st.info("ไม่มีข้อมูลฟอร์มทีมคู่แข่ง")
     st.markdown('</div>', unsafe_allow_html=True)
-
     # ── POLLING ENGINE & COMMENTS — Phase 3 ──
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown(f'<div class="card-title">🗳️ โพลล์แฟนบอล: {POLL_QUESTION}</div>', unsafe_allow_html=True)
