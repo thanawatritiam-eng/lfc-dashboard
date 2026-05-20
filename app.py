@@ -206,7 +206,7 @@ def get_sheets_service():
     return build("sheets", "v4", credentials=creds).spreadsheets()
 
 def get_sheet_id() -> str:
-    return st.["gsheets"]["spreadsheet_id"]
+    return st.secrets["gsheets"]["spreadsheet_id"]
 
 def fetch_comments() -> list:
     try:
