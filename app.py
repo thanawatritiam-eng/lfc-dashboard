@@ -24,25 +24,31 @@ from google.generativeai.types import RequestOptions
 # บังคับให้ใช้ API เวอร์ชัน v1 แทน v1beta
 genai.configure(api_key=st.secrets["gemini_api_key"]["token"], transport='rest')
 
-# 2. นำฟังก์ชันมาวางไว้ในโซน "API CORE" หรือ "GOOGLE SHEETS"
 def get_match_timeline_from_gemini(home_team, away_team, date):
+    import google.generativeai as genai
+    
+    # ตั้งค่า API Key
     genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
     
-    # 1. เปลี่ยนมาใช้โมเดล gemini-1.0-pro ซึ่งรองรับในทุกบัญชีและเสถียรมาก
-def get_match_timeline_from_gemini(home_team, away_team, date):
-    genai.configure(api_key=st.secrets["gemini_api_key"]["token"])
+    # ใช้ gemini-1.5-flash ได้ทันทีอย่างปลอดภัย
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
-    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} วันที่ {date} 
+    วิเคราะห์เหตุการณ์สำคัญของแมตช์ {home_team} พบ {away_team} ในวันที่ {date} 
     ขอรายละเอียด: นาทีที่ทำประตู, ใบเหลือง/แดง, การเปลี่ยนตัว 
-    ขอในรูปแบบ JSON เท่านั้น ดังนี้: [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
-    ห้ามมีข้อความอื่นนอกจาก JSON
+    ตอบกลับในรูปแบบ JSON เท่านั้น ตามโครงสร้างนี้: 
+    [ {{"minute": "นาที", "title": "เหตุการณ์", "detail": "รายละเอียด"}} ]
+    ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
     response = model.generate_content(prompt)
     clean_text = response.text.replace("```json", "").replace("```", "").strip()
-    return json.loads(clean_text)
+    
+    try:
+        return json.loads(clean_text)
+    except json.JSONDecodeError:
+        st.error("⚠️ AI ไม่ได้ส่งค่ากลับมาเป็นรูปแบบ JSON ที่ถูกต้อง")
+        return []
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
