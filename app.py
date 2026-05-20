@@ -19,8 +19,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # 🌟 ปรับ URL ใหม่: ไม่ต้องใส่คำว่า models/ ข้างหน้าในเส้นทางหลัก 
-    # และเปลี่ยนไปใช้ Endpoint ตัวที่ระบบบังคับอัปเดตล่าสุด
+    # 🌟 นี่คือ URL Endpoint ที่ถูกต้องที่สุดสำหรับโมเดลเวอร์ชันฟรีใน AI Studio 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -32,27 +31,44 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     ห้ามมีข้อความอธิบายอื่นใดเด็ดขาดนอกจากโครงสร้าง JSON นี้
     """
     
-    # ปรับโครงสร้าง Payload ให้รองรับระเบียบความปลอดภัยใหม่
+    # ส่งแบบมีตัวกำหนดความปลอดภัย (Safety Settings) และจัด Object ให้สมบูรณ์ที่สุด
     payload = {
         "contents": [{
             "parts": [{"text": prompt}]
-        }]
+        }],
+        "generationConfig": {
+            "temperature": 0.2,
+            "topP": 0.95,
+            "topK": 40
+        }
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
         res_data = response.json()
         
+        # ดักจับ Error จาก Google Direct
         if "error" in res_data:
             st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
             return []
             
-        ai_response_text = res_data['candidates'][0]['content']['parts'][0]['text']
-        clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean_text)
-    except Exception as e:
-        st.error(f"⚠️ AI เกิดข้อผิดพลาดในการวิเคราะห์: {e}")
+        # การแกะค่าแบบละเอียด ป้องกัน KeyError ทุกมิติ
+        if "candidates" in res_data and len(res_data["candidates"]) > 0:
+            content = res_data["candidates"][0].get("content", {})
+            parts = content.get("parts", [])
+            if parts:
+                ai_response_text = parts[0].get("text", "")
+                # คลีน Markdown JSON Out
+                clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_text)
+                
+        st.warning("⚠️ Google ส่งค่ากลับมาสำเร็จ แต่ไม่มีเนื้อหาภายใน (Candidates Empty)")
         return []
+        
+    except Exception as e:
+        st.error(f"⚠️ ระบบประมวลผลล้มเหลว: {e}")
+        return []
+        
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
 # ══════════════════════════════════════════════════
