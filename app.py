@@ -622,15 +622,32 @@ with col_main:
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
         
-        # 💡 เช็กว่าแมตช์ที่เลือกใน Dropdown ด้านบน ตรงกับทีมที่เราเขียนคอนเทนต์ไว้ใน match_data.json หรือไม่
-        # (ตรวจสอบจากคำว่า Chelsea หรือชื่อทีมเยือน/เหย้าเพื่อให้แมตช์กัน)
-        is_json_match = (md["meta"]["away_team"].lower() in a_name.lower()) or (md["meta"]["home_team"].lower() in h_name.lower())
+        # 💡 วิธีแก้ NameError: ดึงชื่อทีมปัจจุบันจากตัวแปรแมตช์ที่ถูกเลือกในตอนนั้นอย่างปลอดภัย
+        current_home_name = ""
+        current_away_name = ""
+        current_m_status = "SCHEDULED"
         
-        if m_status != "FINISHED":
-            # กรณีเลือกแมตช์ที่ยังไม่ได้แข่งขัน
+        if all_fixtures and 'selected_option' in locals():
+            # ถ้ามีข้อมูลจาก API ให้แกะชื่อทีมสโมสรปัจจุบันออกมา
+            _, current_match_obj, _ = selected_option
+            current_home_name = current_match_obj["homeTeam"]["name"].replace("Liverpool FC", "Liverpool")
+            current_away_name = current_match_obj["awayTeam"]["name"].replace("Liverpool FC", "Liverpool")
+            current_m_status = current_match_obj.get("status", "")
+        else:
+            # ถ้า API ขัดข้อง ให้ใช้ค่าจากไฟล์ JSON เป็นหลักแทน
+            current_home_name = md["meta"]["home_team"]
+            current_away_name = md["meta"]["away_team"]
+            current_m_status = "FINISHED"
+
+        # ⚽ เช็กว่าแมตช์ที่เลือกใน Dropdown ตรงกับแมตช์ที่เราเขียนวิเคราะห์ไว้ในไฟล์ JSON หรือไม่
+        is_json_match = (md["meta"]["away_team"].lower() in current_away_name.lower()) or \
+                        (md["meta"]["home_team"].lower() in current_home_name.lower())
+        
+        if current_m_status != "FINISHED":
+            # กรณีเลือกแมตช์ล่วงหน้าที่ยังไม่ได้แข่งขัน
             st.info("⏳ แมตช์นี้ยังไม่ได้เริ่มแข่งขัน จะอัปเดตเหตุการณ์สำคัญ (ประตู, ใบเหลือง-แดง, เปลี่ยนตัว) ทันทีหลังจบเกมครับ")
         elif is_json_match and md.get("timeline"):
-            # กรณีเลือกแมตช์ที่แข่งขันจบแล้ว และตรงกับแมตช์ที่เราวิเคราะห์ไว้ใน JSON (นัด Chelsea)
+            # กรณีเป็นแมตช์ที่แข่งจบแล้ว และตรงกับที่มีข้อมูลไทม์ไลน์ในไฟล์ JSON
             for item in md["timeline"]:
                 st.markdown(
                     f'<div class="timeline-item">'
@@ -643,7 +660,7 @@ with col_main:
                     unsafe_allow_html=True,
                 )
         else:
-            # กรณีเลือกแมตช์อื่น ๆ ที่แข่งจบแล้ว แต่เรายังไม่ได้เขียนเหตุการณ์ลงในไฟล์ JSON
+            # กรณีเลือกแมตช์เก่าคู่อื่น ๆ ที่แข่งจบแล้ว แต่เรายังไม่ได้เขียนเหตุการณ์ลงไป
             st.warning("📊 แมตช์นี้แข่งจบแล้ว แต่อยู่ระหว่างรอแอดมินอัปเดตข้อมูลเหตุการณ์เชิงลึก (ประตู/เปลี่ยนตัว) ลงในระบบหลังบ้านครับ")
             
         st.markdown('</div>', unsafe_allow_html=True)
