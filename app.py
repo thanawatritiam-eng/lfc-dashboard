@@ -19,7 +19,7 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
     
     api_key = st.secrets["gemini_api_key"]["token"]
     
-    # 🌟 แก้ไขตรงนี้: เปลี่ยนโครงสร้าง URL ใหม่ เพื่อให้ระบุปลายทางไปยังโมเดลฟรีของ AI Studio โดยตรง
+    # URL ตัวเก่งของพี่ที่เปิดประตูเชื่อมต่อสำเร็จ
     url = f"https://generativelanguage.googleapis.com/v1beta/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -36,6 +36,32 @@ def get_match_timeline_from_gemini(home_team, away_team, date):
             "parts": [{"text": prompt}]
         }]
     }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        res_data = response.json()
+        
+        # ── เติมส่วนแกะกล่องข้อมูลด้านล่างนี้เพื่อให้ระบบนำค่าไปใช้งานต่อได้ ──
+        if "error" in res_data:
+            st.error(f"❌ Google API แจ้งเตือนข้อผิดพลาด: {res_data['error'].get('message', 'ไม่ทราบสาเหตุ')}")
+            return []
+            
+        if "candidates" in res_data and len(res_data["candidates"]) > 0:
+            content = res_data["candidates"][0].get("content", {})
+            parts = content.get("parts", [])
+            if parts:
+                ai_response_text = parts[0].get("text", "")
+                
+                # คลีนตัวครอบ Markdown บล็อกออกเพื่อให้ระบบมองเห็น JSON บริสุทธิ์
+                clean_text = ai_response_text.replace("```json", "").replace("```", "").strip()
+                
+                # ส่งข้อมูล JSON กลับไปบันทึกลง Google Sheets และแสดงบนหน้าเว็บ
+                return json.loads(clean_text)
+                
+        return []
+    except Exception as e:
+        st.error(f"⚠️ AI เกิดข้อผิดพลาดในการแกะข้อมูล: {e}")
+        return []
         
 # ══════════════════════════════════════════════════
 # PAGE CONFIG
