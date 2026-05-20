@@ -202,7 +202,7 @@ SCOPES    = ["https://www.googleapis.com/auth/spreadsheets"]
 @st.cache_resource
 def get_sheets_service():
     creds = service_account.Credentials.from_service_account_info(
-        st.["gcp_service_account"], scopes=SCOPES)
+        st.secrets["gcp_service_account"], scopes=SCOPES)
     return build("sheets", "v4", credentials=creds).spreadsheets()
 
 def get_sheet_id() -> str:
