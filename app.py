@@ -993,22 +993,36 @@ with col_side:
 
     # 3. นำโค้ด with tab_timeline มาวางไว้ใต้ st.tabs
     with tab_timeline:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
-        
-        # เพิ่มปุ่มวิเคราะห์ AI
-        if st.button("🤖 อัปเดตไทม์ไลน์อัตโนมัติด้วย AI"):
-            with st.spinner("Gemini กำลังวิเคราะห์..."):
-                try:
-                    ai_data = get_match_timeline_from_gemini(h_name, a_name, m_date)
-                    save_timeline_to_sheet2(f"{h_name} vs {a_name}", ai_data)
-                    st.success("✨ บันทึกไทม์ไลน์ลง Sheet2 เรียบร้อยแล้ว!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-        
-        # ... (โค้ดแสดงไทม์ไลน์เดิมของคุณ)
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">⏱️ ลำดับเหตุการณ์สำคัญในเกม</div>', unsafe_allow_html=True)
+    
+    # ปุ่มสั่งงาน AI โดยใช้ค่าตัวแปรจาก Dropdown ปัจจุบัน
+    if st.button(f"🤖 วิเคราะห์ {current_home_name} vs {current_away_name} ด้วย AI"):
+        with st.spinner("Gemini กำลังวิเคราะห์ข้อมูลแมตช์นี้..."):
+            try:
+                # 1. ส่งค่าจากหน้าแรกไปให้ AI
+                ai_data = get_match_timeline_from_gemini(current_home_name, current_away_name, current_m_date)
+                
+                # 2. นำไปบันทึกลง Sheet2
+                save_timeline_to_sheet2(f"{current_home_name} vs {current_away_name}", ai_data)
+                
+                st.success("✨ วิเคราะห์และบันทึกข้อมูลเรียบร้อย!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาด: {e}")
+    
+    # 3. แสดงผลโดยดึงจาก Sheet2 (ฟังก์ชันโหลดของคุณ)
+    # สมมติคุณมีฟังก์ชัน fetch_timeline_from_sheet2() อยู่แล้ว
+    timeline_data = fetch_timeline_from_sheet2(f"{current_home_name} vs {current_away_name}")
+    
+    for item in timeline_data:
+        st.markdown(
+            f'<div class="timeline-item">'
+            f'  <div class="tl-time">{item["minute"]}</div>'
+            f'  <div class="tl-content"><b>{item["title"]}</b><div class="comment-text">{item["detail"]}</div></div>'
+            f'</div>', unsafe_allow_html=True
+        )
+    st.markdown('</div>', unsafe_allow_html=True))
 # ══════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════
