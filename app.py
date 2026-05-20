@@ -319,6 +319,31 @@ def get_sheets_service():
 def get_sheet_id() -> str:
     return st.secrets["gsheets"]["spreadsheet_id"]
 
+def save_timeline_to_sheet2(match_name, timeline_data):
+    """บันทึกข้อมูลไทม์ไลน์ลง Sheet2"""
+    service = get_sheets_service()
+    sheet_id = get_sheet_id()
+    
+    # เตรียมข้อมูลเป็นรายการ (List of lists)
+    # สมมติหัวตารางคือ: | แมตช์ | นาที | เหตุการณ์ | รายละเอียด |
+    values = []
+    for item in timeline_data:
+        values.append([
+            match_name, 
+            item.get("minute", ""), 
+            item.get("title", ""), 
+            item.get("detail", "")
+        ])
+    
+    # คำสั่งเขียนข้อมูลเข้าต่อท้าย (Append)
+    body = {"values": values}
+    service.values().append(
+        spreadsheetId=sheet_id,
+        range="Sheet2!A:D", # กำหนดให้ลงที่ Sheet2 คอลัมน์ A ถึง D
+        valueInputOption="USER_ENTERED",
+        body=body
+    ).execute()
+
 def push_comment(user: str, text: str, border: bool = False) -> bool:
     try:
         # 💡 บังคับสร้างโซนเวลาประเทศไทย (UTC + 7) ให้หมดปัญหาเวลาบันทึกเบี้ยวเป็นเวลาเมืองนอก
